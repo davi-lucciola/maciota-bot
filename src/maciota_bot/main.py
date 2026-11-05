@@ -7,12 +7,12 @@ from maciota_bot.logs import setup_logging
 def main() -> None:
     setup_logging()
     client = build_discord_client()
-    
+
     client.event(on_ready)
     client.event(on_message)
-    
+
     client.run(settings.discord_token.get_secret_value(), log_handler=None)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

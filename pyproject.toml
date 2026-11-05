@@ -1,5 +1,5 @@
 [project]
-name = "lai-bot"
+name = "maciota-bot"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -7,10 +7,13 @@ authors = [
     { name = "Davi Lucciola", email = "davilucciola14@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "discord-py>=2.7.1",
+    "pydantic-settings>=2.16.2",
+]
 
 [project.scripts]
-lai-bot = "lai_bot:main"
+maciota-bot = "maciota_bot.main:main"
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]

@@ -1,7 +1,7 @@
-from lai_bot.client import build_discord_client
-from lai_bot.config import settings
-from lai_bot.events import on_message, on_ready
-from lai_bot.logs import setup_logging
+from maciota_bot.client import build_discord_client
+from maciota_bot.config import settings
+from maciota_bot.events import on_message, on_ready
+from maciota_bot.logs import setup_logging
 
 
 def main() -> None:

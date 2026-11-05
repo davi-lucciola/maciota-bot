@@ -40,7 +40,7 @@ def _config() -> dict[str, Any]:
             "discord.http": {
                 "level": "INFO",
             },
-            "lai_bot": {
+            "maciota_bot": {
                 "handlers": ["console"],
                 "level": "INFO",
                 "propagate": False,

@@ -13,3 +13,8 @@ wheels/
 .env
 discord.log
 discord.log.*
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/

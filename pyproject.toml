@@ -51,7 +51,8 @@ markers = [
     "integration: testes de integração (tests/integration)",
     "client: construção do cliente Discord",
     "config: leitura do token",
-    "events: eventos de ready e message",
+    "events: eventos de ready, message e entrada de membro",
+    "services: texto de boas-vindas",
     "logs: formatação e configuração de logs",
     "startup: arranque do processo",
 ]

@@ -4,6 +4,7 @@ from pathlib import Path
 import discord
 import pytest
 
+from maciota_bot.db import configure_engine
 from maciota_bot.main import main
 from maciota_bot.services.welcome import WELCOME_TEMPLATES
 
@@ -30,6 +31,7 @@ class _Message:
 
 class _Guild:
     def __init__(self, channel: _Channel | None) -> None:
+        self.id = 1
         self.system_channel = channel
 
 
@@ -45,6 +47,10 @@ class _Member:
         self.name = 'ada'
         self.bot = bot
         self.guild = _Guild(channel)
+
+
+def _close_database() -> None:
+    configure_engine(None)
 
 
 def _restore(*names: str) -> None:
@@ -86,6 +92,7 @@ async def test_main_logs_in_with_the_token_and_answers_ping(
         await client.on_message(message)
         assert message.channel.sent == ['pong']
     finally:
+        _close_database()
         _restore('maciota_bot', 'discord', 'discord.http')
 
 
@@ -119,5 +126,65 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         assert len(channel.sent) == 1
         assert channel.sent[0] in expected
         assert 'ada' not in channel.sent[0]
+        assert (tmp_path / 'maciota.db').is_file()
     finally:
+        _close_database()
+        _restore('maciota_bot', 'discord', 'discord.http')
+
+
+async def test_main_syncs_the_welcome_command_when_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    captured: dict[str, object] = {}
+    order: list[str] = []
+
+    def run(
+        self: discord.Client,
+        token: str,
+        *,
+        log_handler: object = None,
+    ) -> None:
+        captured['client'] = self
+
+    async def sync(
+        self: discord.app_commands.CommandTree,
+        *,
+        guild: object = None,
+    ) -> list[object]:
+        order.append('sync')
+        return []
+
+    class _Handler(logging.Handler):
+        def __init__(self, events: list[str]) -> None:
+            super().__init__()
+            self.events = events
+
+        def emit(self, record: logging.LogRecord) -> None:
+            if record.getMessage() == 'Bot conectado':
+                self.events.append('log')
+
+    monkeypatch.setattr(discord.Client, 'run', run)
+    monkeypatch.setattr(discord.app_commands.CommandTree, 'sync', sync)
+    handler = _Handler(order)
+    events_logger = logging.getLogger('maciota_bot.events')
+    try:
+        main()
+
+        client = captured['client']
+        assert isinstance(client, discord.Client)
+        events_logger.addHandler(handler)
+        await client.on_ready()
+        assert order == ['log', 'sync']
+        command = client.tree.get_command('boas-vindas')
+        assert command is not None
+        assert command.name == 'boas-vindas'
+        assert command.guild_only is True
+        assert command.default_permissions is not None
+        assert command.default_permissions.administrator is True
+        assert command.get_parameter('canal') is not None
+    finally:
+        events_logger.removeHandler(handler)
+        _close_database()
         _restore('maciota_bot', 'discord', 'discord.http')

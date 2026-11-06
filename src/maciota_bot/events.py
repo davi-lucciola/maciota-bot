@@ -30,4 +30,5 @@ async def on_member_join(member: discord.Member) -> None:
         logger.warning('Canal de sistema ausente')
         return
 
-    await channel.send(build_welcome_message(member.name))
+    message = build_welcome_message(member.mention)
+    await channel.send(message)

@@ -19,8 +19,9 @@ class _Guild:
 
 
 class _Member:
-    def __init__(self, name: str, *, bot: bool, channel: _Channel | None) -> None:
-        self.name = name
+    def __init__(self, mention: str, *, bot: bool, channel: _Channel | None) -> None:
+        self.mention = mention
+        self.name = 'ada'
         self.bot = bot
         self.guild = _Guild(channel)
 
@@ -31,7 +32,7 @@ async def test_bot_member_sends_nothing(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail)
     channel = _Channel()
-    member = _Member('ada', bot=True, channel=channel)
+    member = _Member('<@42>', bot=True, channel=channel)
 
     await on_member_join(member)
 
@@ -49,11 +50,11 @@ async def test_member_join_sends_the_service_message(
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
     channel = _Channel()
-    member = _Member('ada', bot=False, channel=channel)
+    member = _Member('<@42>', bot=False, channel=channel)
 
     await on_member_join(member)
 
-    assert seen['user_name'] == 'ada'
+    assert seen['user_name'] == '<@42>'
     assert channel.sent == ['oi ada']
 
 
@@ -66,7 +67,7 @@ async def test_missing_system_channel_logs_and_sends_nothing(
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail)
     caplog.set_level(logging.WARNING, logger='maciota_bot.events')
-    member = _Member('ada', bot=False, channel=None)
+    member = _Member('<@42>', bot=False, channel=None)
 
     await on_member_join(member)
 

@@ -36,12 +36,13 @@ class _Guild:
 class _Member:
     def __init__(
         self,
-        name: str,
+        mention: str,
         *,
         bot: bool = False,
         channel: _Channel | None,
     ) -> None:
-        self.name = name
+        self.mention = mention
+        self.name = 'ada'
         self.bot = bot
         self.guild = _Guild(channel)
 
@@ -110,12 +111,13 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         client = captured['client']
         assert isinstance(client, discord.Client)
         channel = _Channel()
-        member = _Member('ada', channel=channel)
+        member = _Member('<@42>', channel=channel)
         await client.on_member_join(member)
         expected = [
-            template.replace('{user_name}', 'ada') for template in WELCOME_TEMPLATES
+            template.replace('{user_name}', '<@42>') for template in WELCOME_TEMPLATES
         ]
         assert len(channel.sent) == 1
         assert channel.sent[0] in expected
+        assert 'ada' not in channel.sent[0]
     finally:
         _restore('maciota_bot', 'discord', 'discord.http')

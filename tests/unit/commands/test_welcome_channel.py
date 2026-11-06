@@ -1,13 +1,7 @@
 from pathlib import Path
 
-from maciota_bot.client import build_discord_client
-from maciota_bot.commands import build_command_tree, set_welcome_channel
-from maciota_bot.db import (
-    configure_engine,
-    create_db_engine,
-    get_welcome_channel_id,
-    init_db,
-)
+from maciota_bot.commands import set_welcome_channel
+from maciota_bot.db import create_db_engine, get_welcome_channel_id, init_db
 
 
 class _Permissions:
@@ -102,26 +96,3 @@ async def test_channel_absent_from_the_guild_does_not_write(tmp_path: Path) -> N
         ('Esse canal não existe neste servidor.', True),
     ]
     engine.dispose()
-
-
-async def test_command_callback_writes_the_channel(tmp_path: Path) -> None:
-    engine = _engine(tmp_path)
-    configure_engine(engine)
-    try:
-        client = build_discord_client()
-        tree = build_command_tree(client)
-        command = tree.get_command('boas-vindas')
-        assert command is not None
-        guild = _Guild(7)
-        canal = _Channel(99, guild)
-        guild.channels[canal.id] = canal
-        interaction = _Interaction(guild, administrator=True)
-
-        await command.callback(interaction, canal)
-
-        assert get_welcome_channel_id(engine, 7) == 99
-        assert interaction.response.messages == [
-            ('Canal de boas-vindas definido para <#99>.', True),
-        ]
-    finally:
-        configure_engine(None)

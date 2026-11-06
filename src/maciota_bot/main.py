@@ -14,7 +14,7 @@ def main() -> None:
     configure_engine(engine)
 
     client = build_discord_client()
-    tree = build_command_tree(client)
+    tree = build_command_tree(client, engine=engine)
 
     async def on_ready() -> None:
         await log_bot_connected()

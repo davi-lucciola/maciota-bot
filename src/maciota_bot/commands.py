@@ -2,7 +2,6 @@ import discord
 from discord import app_commands
 from sqlalchemy.engine import Engine
 
-from maciota_bot.db import current_engine
 from maciota_bot.db import set_welcome_channel as save_welcome_channel
 
 
@@ -13,10 +12,6 @@ async def set_welcome_channel(
     engine: Engine,
 ) -> None:
     guild = interaction.guild
-    if guild is None:
-        await _reply(interaction, 'Esse comando só funciona em um servidor.')
-        return
-
     if not interaction.user.guild_permissions.administrator:
         await _reply(
             interaction,
@@ -35,7 +30,11 @@ async def set_welcome_channel(
     )
 
 
-def build_command_tree(client: discord.Client) -> app_commands.CommandTree:
+def build_command_tree(
+    client: discord.Client,
+    *,
+    engine: Engine,
+) -> app_commands.CommandTree:
     tree = app_commands.CommandTree(client)
     client.tree = tree
 
@@ -49,9 +48,6 @@ def build_command_tree(client: discord.Client) -> app_commands.CommandTree:
         interaction: discord.Interaction,
         canal: discord.TextChannel,
     ) -> None:
-        engine = current_engine()
-        if engine is None:
-            raise RuntimeError('Banco de dados não configurado')
         await set_welcome_channel(interaction, canal, engine=engine)
 
     return tree

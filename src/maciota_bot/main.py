@@ -1,4 +1,3 @@
-from maciota_bot.agent import build_agent
 from maciota_bot.client import build_discord_client
 from maciota_bot.commands import build_command_tree
 from maciota_bot.config import settings
@@ -15,7 +14,7 @@ def main() -> None:
     client = build_discord_client()
     tree = build_command_tree(client)
 
-    state = AppState(engine=engine, tree=tree, agent=build_agent(), client=client)
+    state = AppState(engine=engine, tree=tree, agent=None, client=client)
     configure(state=state)
 
     client.event(on_ready)
@@ -24,7 +23,9 @@ def main() -> None:
     _close_client = client.close
 
     async def _close() -> None:
-        await get_state().agent.aclose()
+        agent = get_state().agent
+        if agent is not None:
+            await agent.aclose()
         await _close_client()
 
     client.close = _close

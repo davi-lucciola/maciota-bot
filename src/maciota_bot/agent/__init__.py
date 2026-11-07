@@ -2,9 +2,8 @@ import aiosqlite
 from langchain.chat_models import BaseChatModel
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from langgraph.graph.state import CompiledStateGraph
 
-from maciota_bot.agent.graph import build_graph
+from maciota_bot.agent.graph import BotGraph, build_graph
 from maciota_bot.agent.llm import get_chat_model
 from maciota_bot.agent.schema import AgentInput, AgentOutput
 from maciota_bot.config import settings
@@ -16,40 +15,20 @@ class Agent:
         *,
         light_model: BaseChatModel,
         reply_model: BaseChatModel,
-        checkpointer: BaseCheckpointSaver | None = None,
+        checkpointer: BaseCheckpointSaver,
     ) -> None:
-        self._light_model = light_model
-        self._reply_model = reply_model
-        self._connection: aiosqlite.Connection | None = None
-        self._graph: CompiledStateGraph | None = None
-        if checkpointer is not None:
-            self._graph = build_graph(
-                checkpointer,
-                light_model=light_model,
-                reply_model=reply_model,
-            )
-
-    async def setup(self, path: str) -> None:
-        connection = await aiosqlite.connect(path)
-        saver = AsyncSqliteSaver(connection)
-        await saver.setup()
-        self._connection = connection
-        self._graph = build_graph(
-            saver,
-            light_model=self._light_model,
-            reply_model=self._reply_model,
+        self._checkpointer = checkpointer
+        self._graph: BotGraph = build_graph(
+            checkpointer,
+            light_model=light_model,
+            reply_model=reply_model,
         )
 
     async def aclose(self) -> None:
-        connection = self._connection
-        self._connection = None
-        if connection is not None:
-            await connection.close()
+        if isinstance(self._checkpointer, AsyncSqliteSaver):
+            await self._checkpointer.conn.close()
 
     async def execute(self, turn: AgentInput) -> AgentOutput:
-        if self._graph is None:
-            raise RuntimeError('O agente ainda não abriu o checkpoint')
-
         result = await self._graph.ainvoke(
             turn.to_state(),
             {'configurable': {'thread_id': f'channel_{turn.channel_id}'}},
@@ -61,8 +40,12 @@ class Agent:
         )
 
 
-def build_agent() -> Agent:
+async def build_agent() -> Agent:
+    connection = await aiosqlite.connect(settings.checkpoint_path)
+    saver = AsyncSqliteSaver(connection)
+    await saver.setup()
     return Agent(
+        checkpointer=saver,
         light_model=get_chat_model(settings.llm_light_model, temperature=0),
         reply_model=get_chat_model(settings.llm_model, temperature=0.8),
     )

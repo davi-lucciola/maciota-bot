@@ -1,7 +1,9 @@
 from pathlib import Path
 
+import aiosqlite
 from langchain.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from maciota_bot.agent import Agent
 from maciota_bot.agent.schema import (
@@ -218,8 +220,10 @@ async def test_model_sees_only_the_last_thirty_messages() -> None:
 async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
     light = ScriptedModel(['ironia curta'])
     reply = ScriptedModel(['ok'])
-    agent = Agent(light_model=light, reply_model=reply)
-    await agent.setup(str(tmp_path / 'checkpoints.sqlite'))
+    connection = await aiosqlite.connect(tmp_path / 'checkpoints.sqlite')
+    saver = AsyncSqliteSaver(connection)
+    await saver.setup()
+    agent = Agent(light_model=light, reply_model=reply, checkpointer=saver)
     try:
         await _say(agent, 'segredo', channel_id=1, message_id=1)
         await _say(agent, 'de novo', channel_id=1, message_id=2)

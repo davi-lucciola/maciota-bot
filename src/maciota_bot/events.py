@@ -3,8 +3,8 @@ from typing import Literal
 
 import discord
 
+from maciota_bot.agent import build_agent
 from maciota_bot.agent.schema import AgentInput, AgentOutput
-from maciota_bot.config import settings
 from maciota_bot.db import init_db
 from maciota_bot.services.welcome import (
     build_welcome_message,
@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 async def on_ready() -> None:
     state = get_state()
 
-    await state.agent.setup(settings.checkpoint_path)
+    if state.agent is None:
+        state.agent = await build_agent()
     await init_db(state.engine)
     await state.tree.sync()
 
@@ -30,12 +31,16 @@ async def on_message(message: discord.Message) -> None:
         return
 
     state = get_state()
+    agent = state.agent
+    if agent is None:
+        return
+
     user = state.client.user
     trigger_type: Literal['mention', 'proactive'] = (
         'mention' if user is not None and user.mentioned_in(message) else 'proactive'
     )
     try:
-        output = await state.agent.execute(_turn(message, trigger_type))
+        output = await agent.execute(_turn(message, trigger_type))
         await _send_output(message, output)
     except Exception:
         logger.exception('Falha ao responder no canal')

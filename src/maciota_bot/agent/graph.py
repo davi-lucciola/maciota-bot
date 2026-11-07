@@ -6,6 +6,8 @@ from langgraph.graph.state import CompiledStateGraph
 from maciota_bot.agent.nodes import make_nodes
 from maciota_bot.agent.state import BotState
 
+type BotGraph = CompiledStateGraph[BotState, None, BotState, BotState]
+
 
 def route_after_trigger(state: BotState) -> str:
     if state['approved']:
@@ -17,7 +19,7 @@ def build_graph(
     checkpointer: BaseCheckpointSaver,
     light_model: BaseChatModel,
     reply_model: BaseChatModel,
-) -> CompiledStateGraph:
+) -> BotGraph:
     evaluate_trigger, persona_router, generate_response = make_nodes(
         light_model,
         reply_model,

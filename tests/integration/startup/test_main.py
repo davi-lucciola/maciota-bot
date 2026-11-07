@@ -84,7 +84,7 @@ async def test_main_logs_in_with_the_token_and_publishes_the_agent(
         assert get_state().engine is not None
         assert get_state().tree is client.tree
         assert get_state().client is client
-        assert isinstance(get_state().agent, Agent)
+        assert get_state().agent is None
         assert client.on_ready is on_ready
         assert client.on_message is on_message
         assert client.on_member_join is on_member_join
@@ -123,6 +123,7 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         client = captured['client']
         assert isinstance(client, discord.Client)
         await client.on_ready()
+        assert isinstance(get_state().agent, Agent)
         assert (tmp_path / 'maciota.db').is_file()
         channel = _Channel()
         member = _Member('<@42>', channel=channel)
@@ -174,6 +175,7 @@ async def test_main_syncs_the_welcome_command_when_ready(
         assert isinstance(client, discord.Client)
         events_logger.addHandler(handler)
         await client.on_ready()
+        assert isinstance(get_state().agent, Agent)
         assert order == ['sync', 'log']
         command = client.tree.get_command('boas-vindas')
         assert command is not None

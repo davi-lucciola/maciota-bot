@@ -11,7 +11,7 @@ from maciota_bot.agent import Agent
 class AppState:
     engine: AsyncEngine
     tree: app_commands.CommandTree
-    agent: Agent
+    agent: Agent | None
     client: discord.Client
 
 

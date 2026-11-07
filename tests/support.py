@@ -15,10 +15,6 @@ class IdleTree:
 class IdleAgent:
     def __init__(self) -> None:
         self.calls: list[object] = []
-        self.checkpoint_path: str | None = None
-
-    async def setup(self, path: str) -> None:
-        self.checkpoint_path = path
 
     async def execute(self, turn: object) -> str:
         self.calls.append(turn)
@@ -60,6 +56,7 @@ async def release_engine() -> None:
         return
     _disposed.add(identity)
     await engine.dispose()
-    close = getattr(get_state().agent, 'aclose', None)
+    agent = get_state().agent
+    close = getattr(agent, 'aclose', None) if agent is not None else None
     if close is not None:
         await close()

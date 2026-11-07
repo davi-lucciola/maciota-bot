@@ -49,7 +49,7 @@ def _saved_channel(
     monkeypatch: pytest.MonkeyPatch,
     channel_id: int | None,
 ) -> None:
-    def read(guild_id: int) -> int | None:
+    async def read(guild_id: int) -> int | None:
         return channel_id
 
     monkeypatch.setattr('maciota_bot.events.get_welcome_channel_id', read)
@@ -61,7 +61,7 @@ async def test_bot_member_sends_nothing(
     def fail_message(user_name: str) -> str:
         raise AssertionError(user_name)
 
-    def fail_read(guild_id: int) -> int | None:
+    async def fail_read(guild_id: int) -> int | None:
         raise AssertionError(guild_id)
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail_message)

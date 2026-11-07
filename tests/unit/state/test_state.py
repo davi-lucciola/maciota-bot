@@ -1,24 +1,20 @@
-from collections.abc import Iterator
 from pathlib import Path
 
-import pytest
-
 from maciota_bot.db import create_db_engine
-from maciota_bot.state import AppState, configure
+from maciota_bot.state import AppState, configure, get_state
 
 
-@pytest.fixture(autouse=True)
-def _reset_state() -> Iterator[None]:
-    configure(AppState())
-    yield
-    configure(AppState())
-
-
-def test_replacing_the_state_disposes_the_previous_engine(tmp_path: Path) -> None:
+async def test_configure_publishes_the_engine_get_state_returns(tmp_path: Path) -> None:
     engine = create_db_engine(f'sqlite:///{tmp_path / "state.db"}')
-    pool = engine.pool
     configure(AppState(engine=engine))
 
-    configure(AppState())
+    assert get_state().engine is engine
+    assert engine.url.drivername == 'sqlite+aiosqlite'
 
-    assert engine.pool is not pool
+
+async def test_sqlite_aiosqlite_url_keeps_the_driver(tmp_path: Path) -> None:
+    engine = create_db_engine(f'sqlite+aiosqlite:///{tmp_path / "already.db"}')
+    configure(AppState(engine=engine))
+
+    assert get_state().engine is engine
+    assert engine.url.drivername == 'sqlite+aiosqlite'

@@ -2,18 +2,23 @@ import logging
 
 import discord
 
+from maciota_bot.db import init_db
 from maciota_bot.services.welcome import (
     build_welcome_message,
     get_welcome_channel_id,
 )
-from maciota_bot.state import current
+from maciota_bot.state import get_state
 
 logger = logging.getLogger(__name__)
 
 
 async def on_ready() -> None:
+    state = get_state()
+    if state.engine is not None:
+        await init_db(state.engine)
+
     logger.info('Bot conectado')
-    tree = current().tree
+    tree = state.tree
     assert tree is not None
     await tree.sync()
 
@@ -32,7 +37,7 @@ async def on_member_join(member: discord.Member) -> None:
     if member.bot:
         return
 
-    channel = _configured_channel(member)
+    channel = await _configured_channel(member)
     if channel is None:
         channel = member.guild.system_channel
     if channel is None:
@@ -43,8 +48,10 @@ async def on_member_join(member: discord.Member) -> None:
     await channel.send(message)
 
 
-def _configured_channel(member: discord.Member) -> discord.abc.Messageable | None:
-    channel_id = get_welcome_channel_id(member.guild.id)
+async def _configured_channel(
+    member: discord.Member,
+) -> discord.abc.Messageable | None:
+    channel_id = await get_welcome_channel_id(member.guild.id)
     if channel_id is None:
         return None
 

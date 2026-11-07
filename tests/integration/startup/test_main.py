@@ -8,7 +8,8 @@ import pytest
 from maciota_bot.events import on_member_join, on_message, on_ready
 from maciota_bot.main import main
 from maciota_bot.services.welcome import WELCOME_TEMPLATES
-from maciota_bot.state import AppState, configure, current
+from maciota_bot.state import get_state
+from tests.support import release_engine
 
 
 class _Author:
@@ -51,10 +52,6 @@ class _Member:
         self.guild = _Guild(channel)
 
 
-def _close_database() -> None:
-    configure(AppState())
-
-
 def _restore(*names: str) -> None:
     for name in names:
         logger = logging.getLogger(name)
@@ -90,8 +87,8 @@ async def test_main_logs_in_with_the_token_and_answers_ping(
         assert captured['log_handler'] is None
         client = captured['client']
         assert isinstance(client, discord.Client)
-        assert current().engine is not None
-        assert current().tree is client.tree
+        assert get_state().engine is not None
+        assert get_state().tree is client.tree
         assert client.on_ready is on_ready
         assert client.on_message is on_message
         assert client.on_member_join is on_member_join
@@ -99,7 +96,7 @@ async def test_main_logs_in_with_the_token_and_answers_ping(
         await client.on_message(message)
         assert message.channel.sent == ['pong']
     finally:
-        _close_database()
+        await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')
 
 
@@ -118,12 +115,22 @@ async def test_main_sends_a_welcome_when_a_member_joins(
     ) -> None:
         captured['client'] = self
 
+    async def sync(
+        self: discord.app_commands.CommandTree,
+        *,
+        guild: object = None,
+    ) -> list[object]:
+        return []
+
     monkeypatch.setattr(discord.Client, 'run', run)
+    monkeypatch.setattr(discord.app_commands.CommandTree, 'sync', sync)
     try:
         main()
 
         client = captured['client']
         assert isinstance(client, discord.Client)
+        await client.on_ready()
+        assert (tmp_path / 'maciota.db').is_file()
         channel = _Channel()
         member = _Member('<@42>', channel=channel)
         await client.on_member_join(member)
@@ -133,9 +140,8 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         assert len(channel.sent) == 1
         assert channel.sent[0] in expected
         assert 'ada' not in channel.sent[0]
-        assert (tmp_path / 'maciota.db').is_file()
     finally:
-        _close_database()
+        await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')
 
 
@@ -185,5 +191,5 @@ async def test_main_syncs_the_welcome_command_when_ready(
         assert command.get_parameter('canal') is not None
     finally:
         events_logger.removeHandler(handler)
-        _close_database()
+        await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')

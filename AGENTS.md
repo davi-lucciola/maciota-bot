@@ -2,17 +2,17 @@
 
 ## Architecture
 
-`main` composes the process. It configures logging, opens the database, builds the Discord client and the command tree, stores those shared instances, registers the event handlers, and starts the gateway.
+`main` composes the process. It configures logging, opens the async database engine, builds the Discord client and the command tree, stores those shared instances, registers the event handlers, and starts the gateway.
 
-`state` holds the shared instances the rest of the process reads: the SQLAlchemy engine and the command tree. `main` writes this state before `client.run`. Services and events read it with `current()`. A test that needs the engine or the tree publishes an `AppState` and clears it afterwards. Replacing the state disposes the previous engine.
+`state` holds the shared instances the rest of the process reads: the async SQLAlchemy engine and the command tree. `main` creates that engine once and writes this state before `client.run`. Services and events read it with `get_state()`. A test that needs the engine or the tree publishes an `AppState` and clears it afterwards.
 
-`db` opens the engine and creates the tables.
+`db` opens the async engine through aiosqlite. `on_ready` creates the tables on the Discord event loop.
 
 `models` defines the tables.
 
 `commands` registers slash-command entrypoints. A handler calls a service and returns.
 
-`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` logs that the bot connected and syncs the command tree from state.
+`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` creates the tables, logs that the bot connected, and syncs the command tree from state.
 
 `services/welcome` builds the welcome text, reads and writes a guild's welcome channel, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
 

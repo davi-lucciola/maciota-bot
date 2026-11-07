@@ -1,25 +1,24 @@
 from dataclasses import dataclass
 
 from discord import app_commands
-from sqlalchemy.engine import Engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 
 @dataclass
 class AppState:
-    engine: Engine | None = None
+    engine: AsyncEngine | None = None
     tree: app_commands.CommandTree | None = None
 
 
-class _StateHolder:
-    current = AppState()
+_state: AppState | None = None
 
 
-def current() -> AppState:
-    return _StateHolder.current
+def get_state() -> AppState:
+    if _state is None:
+        raise RuntimeError('Application state is not configured')
+    return _state
 
 
 def configure(state: AppState) -> None:
-    previous = _StateHolder.current.engine
-    _StateHolder.current = state
-    if previous is not None and previous is not state.engine:
-        previous.dispose()
+    global _state  # noqa: PLW0603
+    _state = state

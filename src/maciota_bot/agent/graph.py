@@ -1,4 +1,7 @@
+from langchain.chat_models import BaseChatModel
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from maciota_bot.agent.nodes import make_nodes
 from maciota_bot.agent.state import BotState
@@ -10,11 +13,16 @@ def route_after_trigger(state: BotState) -> str:
     return END
 
 
-def build_graph(checkpointer: object, light_model: object, reply_model: object):
+def build_graph(
+    checkpointer: BaseCheckpointSaver,
+    light_model: BaseChatModel,
+    reply_model: BaseChatModel,
+) -> CompiledStateGraph:
     evaluate_trigger, persona_router, generate_response = make_nodes(
         light_model,
         reply_model,
     )
+
     graph = StateGraph(BotState)
     graph.add_node('evaluate_trigger', evaluate_trigger)
     graph.add_node('persona_router', persona_router)

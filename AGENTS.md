@@ -12,9 +12,9 @@
 
 `commands` registers slash-command entrypoints. A handler calls a service and returns.
 
-`agent` answers a channel message. `Agent.execute` runs the LangGraph for that channel and returns the text to send. The graph checkpoint is its own SQLite file. `get_session()` stays on the SQLModel tables.
+`agent` answers a channel message. `Agent.execute` runs the LangGraph for that channel and returns the text to send and, when the bot is answering a person, that message id. The graph checkpoint is an AsyncSqliteSaver opened on ready, in its own SQLite file. `get_session()` stays on the SQLModel tables.
 
-`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` creates the tables, syncs the command tree, and then logs that the bot connected. `on_message` ignores a bot author and calls `Agent.execute`.
+`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` opens the checkpoint, creates the tables, syncs the command tree, and then logs that the bot connected. `on_message` ignores a bot author and a direct message, then calls `Agent.execute`. A reply target becomes a Discord message reference; otherwise the text goes to the channel.
 
 `services/welcome` builds the welcome text, reads and writes a guild's welcome channel, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
 

@@ -12,7 +12,12 @@ class BotState(TypedDict):
     message_id: int
     author_name: str
     trigger_type: str
+    guild_name: str | None
+    guild_description: str | None
+    channel_name: str | None
+    channel_topic: str | None
     context_hook: str
     persona_style: str
     final_response: str
+    reply_to_message_id: int | None
     approved: bool

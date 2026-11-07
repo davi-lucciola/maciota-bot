@@ -1,3 +1,4 @@
+from maciota_bot.agent.schema import AgentInput, AgentOutput
 from maciota_bot.events import on_message
 from maciota_bot.state import configure, get_state
 from tests.support import make_state
@@ -9,13 +10,24 @@ class _Author:
         self.display_name = name
 
 
+class _Guild:
+    def __init__(self) -> None:
+        self.id = 3
+        self.name = 'Servidor'
+        self.description = 'um lugar'
+
+
 class _Channel:
     def __init__(self) -> None:
         self.id = 7
+        self.name = 'geral'
+        self.topic = 'assunto'
         self.sent: list[str] = []
+        self.references: list[object | None] = []
 
-    async def send(self, content: str) -> None:
+    async def send(self, content: str, *, reference: object | None = None) -> None:
         self.sent.append(content)
+        self.references.append(reference)
 
 
 class _Message:
@@ -25,30 +37,52 @@ class _Message:
         *,
         bot: bool = False,
         mentioned: bool = False,
+        direct: bool = False,
     ) -> None:
         self.content = content
         self.id = 99
         self.mentioned = mentioned
         self.author = _Author(bot=bot)
         self.channel = _Channel()
+        self.guild = None if direct else _Guild()
 
 
 class _Agent:
-    def __init__(self, response: str = '', *, fail: bool = False) -> None:
-        self.response = response
+    def __init__(
+        self,
+        response: str = '',
+        *,
+        fail: bool = False,
+        reply_to: int | None = None,
+    ) -> None:
+        self.output = AgentOutput(text=response, reply_to_message_id=reply_to)
         self.fail = fail
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[AgentInput] = []
 
-    async def execute(self, **kwargs: object) -> str:
-        self.calls.append(kwargs)
+    async def execute(self, turn: AgentInput) -> AgentOutput:
+        self.calls.append(turn)
         if self.fail:
             raise RuntimeError('model down')
-        return self.response
+        return self.output
 
 
 def _publish(agent: _Agent) -> None:
     current = get_state()
     configure(make_state(current.engine, tree=current.tree, agent=agent))
+
+
+def _turn(*, trigger_type: str, content: str) -> AgentInput:
+    return AgentInput(
+        channel_id=7,
+        message_id=99,
+        author_name='Ada',
+        content=content,
+        trigger_type=trigger_type,
+        guild_name='Servidor',
+        guild_description='um lugar',
+        channel_name='geral',
+        channel_topic='assunto',
+    )
 
 
 async def test_bot_author_receives_no_reply() -> None:
@@ -62,35 +96,39 @@ async def test_bot_author_receives_no_reply() -> None:
     assert agent.calls == []
 
 
-async def test_mention_sends_the_agent_text() -> None:
-    agent = _Agent('cheguei')
+async def test_direct_message_receives_no_reply() -> None:
+    agent = _Agent('oi')
+    _publish(agent)
+    message = _Message('oi', direct=True)
+
+    await on_message(message)
+
+    assert message.channel.sent == []
+    assert agent.calls == []
+
+
+async def test_mention_replies_to_the_message() -> None:
+    agent = _Agent('cheguei', reply_to=99)
     _publish(agent)
     message = _Message('e ai', mentioned=True)
 
     await on_message(message)
 
     assert message.channel.sent == ['cheguei']
-    assert agent.calls == [
-        {
-            'channel_id': 7,
-            'message_id': 99,
-            'author_name': 'Ada',
-            'content': 'e ai',
-            'trigger_type': 'mention',
-        }
-    ]
+    assert message.channel.references[0].message_id == 99
+    assert agent.calls == [_turn(trigger_type='mention', content='e ai')]
 
 
-async def test_ordinary_text_is_proactive() -> None:
+async def test_ordinary_text_is_a_channel_message() -> None:
     agent = _Agent('kkk')
     _publish(agent)
     message = _Message('!ping')
 
     await on_message(message)
 
-    assert agent.calls[0]['trigger_type'] == 'proactive'
-    assert agent.calls[0]['content'] == '!ping'
+    assert agent.calls == [_turn(trigger_type='proactive', content='!ping')]
     assert message.channel.sent == ['kkk']
+    assert message.channel.references == [None]
 
 
 async def test_empty_response_sends_nothing() -> None:

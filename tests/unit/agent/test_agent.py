@@ -4,32 +4,53 @@ from langchain.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from maciota_bot.agent import Agent
-from maciota_bot.agent.checkpointer import open_checkpointer
+from maciota_bot.agent.schema import (
+    AgentInput,
+    AgentOutput,
+    TriggerAction,
+    TriggerDecision,
+)
 
 
 class ScriptedModel:
-    def __init__(self, replies: list[str]) -> None:
+    def __init__(self, replies: list[object]) -> None:
         self._replies = list(replies)
         self.seen: list[list[object]] = []
 
+    def with_structured_output(self, schema: type[object]) -> '_Structured':
+        return _Structured(self, schema)
+
     async def ainvoke(self, messages: list[object]) -> AIMessage:
         self.seen.append(list(messages))
+        item = self._next()
+        if not isinstance(item, str):
+            raise AssertionError(item)
+        return AIMessage(content=item)
+
+    def _next(self) -> object:
         if not self._replies:
             raise AssertionError('model called too many times')
         if len(self._replies) == 1:
-            text = self._replies[0]
-        else:
-            text = self._replies.pop(0)
-        return AIMessage(content=text)
+            return self._replies[0]
+        return self._replies.pop(0)
 
 
-def _agent(
-    light: ScriptedModel,
-    reply: ScriptedModel,
-    checkpointer: object | None = None,
-) -> Agent:
+class _Structured:
+    def __init__(self, model: ScriptedModel, schema: type[object]) -> None:
+        self._model = model
+        self._schema = schema
+
+    async def ainvoke(self, messages: list[object]) -> object:
+        self._model.seen.append(list(messages))
+        item = self._model._next()
+        if not isinstance(item, self._schema):
+            raise AssertionError(item)
+        return item
+
+
+def _agent(light: ScriptedModel, reply: ScriptedModel) -> Agent:
     return Agent(
-        checkpointer=MemorySaver() if checkpointer is None else checkpointer,
+        checkpointer=MemorySaver(),
         light_model=light,
         reply_model=reply,
     )
@@ -42,13 +63,19 @@ async def _say(
     channel_id: int = 1,
     message_id: int = 1,
     trigger_type: str = 'mention',
-) -> str:
+    guild_name: str | None = None,
+    channel_name: str | None = None,
+) -> AgentOutput:
     return await agent.execute(
-        channel_id=channel_id,
-        message_id=message_id,
-        author_name='Ada',
-        content=content,
-        trigger_type=trigger_type,
+        AgentInput(
+            channel_id=channel_id,
+            message_id=message_id,
+            author_name='Ada',
+            content=content,
+            trigger_type=trigger_type,
+            guild_name=guild_name,
+            channel_name=channel_name,
+        )
     )
 
 
@@ -70,38 +97,107 @@ async def test_mention_skips_the_hook_and_returns_the_reply() -> None:
     reply = ScriptedModel(['kkkkk intankavel'])
     agent = _agent(light, reply)
 
-    text = await _say(agent, 'e ai')
+    text = await _say(agent, 'e ai', guild_name='Maciota', channel_name='geral')
 
-    assert text == 'kkkkk intankavel'
+    assert text.text == 'kkkkk intankavel'
+    assert text.reply_to_message_id == 1
     assert len(light.seen) == 1
-    assert 'gancho claro' not in _system(light.seen[0])
+    assert 'Decida se o Maciota entra' not in _system(light.seen[0])
     assert 'ironia curta' in _system(reply.seen[0])
     assert 'dois parágrafos' in _system(reply.seen[0])
+    assert 'Servidor: Maciota.' in _system(reply.seen[0])
+    assert 'Canal: geral.' in _system(reply.seen[0])
+    assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[0])
 
 
 async def test_proactive_refusal_sends_nothing() -> None:
-    light = ScriptedModel(['NÃO'])
+    light = ScriptedModel([
+        TriggerDecision(
+            reasoning='não tem gancho',
+            action=TriggerAction.SILENCE,
+            message_index=None,
+            hook='',
+        )
+    ])
     reply = ScriptedModel(['não devia chegar'])
     agent = _agent(light, reply)
 
     text = await _say(agent, 'só um oi', trigger_type='proactive')
 
-    assert not text
+    assert not text.text
+    assert text.reply_to_message_id is None
     assert len(light.seen) == 1
-    assert 'gancho claro' in _system(light.seen[0])
+    assert 'Decida se o Maciota entra' in _system(light.seen[0])
     assert reply.seen == []
 
 
-async def test_proactive_hook_reaches_the_reply() -> None:
-    light = ScriptedModel(['SIM\no controle sumiu', 'zoeira direta'])
+async def test_proactive_channel_message_reaches_the_reply() -> None:
+    light = ScriptedModel([
+        TriggerDecision(
+            reasoning='o controle sumiu',
+            action=TriggerAction.CHANNEL,
+            message_index=None,
+            hook='o controle sumiu',
+        ),
+        'zoeira direta',
+    ])
     reply = ScriptedModel(['sumiu mesmo'])
     agent = _agent(light, reply)
 
     text = await _say(agent, 'cadê o controle', trigger_type='proactive')
 
-    assert text == 'sumiu mesmo'
+    assert text.text == 'sumiu mesmo'
+    assert text.reply_to_message_id is None
     assert 'o controle sumiu' in _system(reply.seen[0])
     assert 'zoeira direta' in _system(reply.seen[0])
+    assert 'Mensagem geral no canal' in _system(reply.seen[0])
+
+
+async def test_proactive_reply_uses_the_message_id() -> None:
+    light = ScriptedModel([
+        'ironia curta',
+        TriggerDecision(
+            reasoning='a Ada perdeu o controle',
+            action=TriggerAction.REPLY,
+            message_index=0,
+            hook='o controle sumiu',
+        ),
+        'zoeira direta',
+    ])
+    reply = ScriptedModel(['sumiu mesmo', 'de novo'])
+    agent = _agent(light, reply)
+
+    await _say(agent, 'cadê o controle', message_id=10)
+    text = await _say(
+        agent,
+        'alguém viu?',
+        message_id=11,
+        trigger_type='proactive',
+    )
+
+    assert text.text == 'de novo'
+    assert text.reply_to_message_id == 10
+    assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[-1])
+
+
+async def test_invalid_reply_index_falls_back_to_the_channel() -> None:
+    light = ScriptedModel([
+        TriggerDecision(
+            reasoning='tem gancho, índice ruim',
+            action=TriggerAction.REPLY,
+            message_index=9,
+            hook='o controle sumiu',
+        ),
+        'zoeira direta',
+    ])
+    reply = ScriptedModel(['sumiu mesmo'])
+    agent = _agent(light, reply)
+
+    text = await _say(agent, 'cadê o controle', trigger_type='proactive')
+
+    assert text.text == 'sumiu mesmo'
+    assert text.reply_to_message_id is None
+    assert 'Mensagem geral no canal' in _system(reply.seen[0])
 
 
 async def test_model_sees_only_the_last_thirty_messages() -> None:
@@ -120,16 +216,18 @@ async def test_model_sees_only_the_last_thirty_messages() -> None:
 
 
 async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
-    checkpointer = open_checkpointer(str(tmp_path / 'checkpoints.sqlite'))
     light = ScriptedModel(['ironia curta'])
     reply = ScriptedModel(['ok'])
-    agent = _agent(light, reply, checkpointer)
+    agent = Agent(light_model=light, reply_model=reply)
+    await agent.setup(str(tmp_path / 'checkpoints.sqlite'))
+    try:
+        await _say(agent, 'segredo', channel_id=1, message_id=1)
+        await _say(agent, 'de novo', channel_id=1, message_id=2)
+        assert 'Ada: segredo' in _conversation(reply.seen[-1])
 
-    await _say(agent, 'segredo', channel_id=1, message_id=1)
-    await _say(agent, 'de novo', channel_id=1, message_id=2)
-    assert 'Ada: segredo' in _conversation(reply.seen[-1])
-
-    await _say(agent, 'outro', channel_id=2, message_id=3)
-    conversation = _conversation(reply.seen[-1])
-    assert 'Ada: segredo' not in conversation
-    assert 'Ada: outro' in conversation
+        await _say(agent, 'outro', channel_id=2, message_id=3)
+        conversation = _conversation(reply.seen[-1])
+        assert 'Ada: segredo' not in conversation
+        assert 'Ada: outro' in conversation
+    finally:
+        await agent.aclose()

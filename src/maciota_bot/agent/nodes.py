@@ -1,35 +1,21 @@
-from typing import Any
-
-from langchain.messages import AIMessage, SystemMessage
+from langchain.chat_models import BaseChatModel
+from langchain.messages import AIMessage, HumanMessage, SystemMessage
 
 from maciota_bot.agent.prompt import (
-    HOOK_PROMPT,
     PERSONA_PROMPT,
     STYLES,
-    channel_line,
     recent_messages,
     reply_prompt,
+    server_context,
+    trigger_instruction,
 )
+from maciota_bot.agent.schema import TriggerAction, TriggerDecision
 from maciota_bot.agent.state import BotState
 
 
 def model_input(state: BotState, instruction: str) -> list:
-    system = f'{channel_line(state)}\n\n{instruction}'
+    system = f'{server_context(state)}\n\n{instruction}'
     return [SystemMessage(content=system), *recent_messages(state)]
-
-
-def decide_hook(text: str) -> tuple[bool, str]:
-    lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
-    if not lines:
-        return False, ''
-    head = lines[0].casefold()
-    if head.startswith('não') or head.startswith('nao'):
-        return False, ''
-    if head.startswith('sim'):
-        if len(lines) > 1:
-            return True, lines[1]
-        return True, lines[0][3:].strip(' :-')
-    return False, ''
 
 
 def select_style(text: str) -> str:
@@ -40,39 +26,72 @@ def select_style(text: str) -> str:
     return STYLES[0]
 
 
-async def read_model(model: Any, messages: list) -> str:
-    reply = await model.ainvoke(messages)
-    content = reply.content
-    if isinstance(content, str):
-        return content
-    return ''.join(part if isinstance(part, str) else str(part) for part in content)
+def message_id_at(state: BotState, index: int | None) -> int | None:
+    if index is None:
+        return None
+    window = recent_messages(state)
+    if index < 0 or index >= len(window):
+        return None
+    message = window[index]
+    if not isinstance(message, HumanMessage) or message.id is None:
+        return None
+    return int(message.id)
 
 
-def make_nodes(light_model: object, reply_model: object) -> tuple:
+def make_nodes(
+    light_model: BaseChatModel,
+    reply_model: BaseChatModel,
+) -> tuple:
     async def evaluate_trigger(state: BotState) -> dict[str, object]:
         if state['trigger_type'] == 'mention':
-            return {'approved': True, 'context_hook': ''}
+            return {
+                'approved': True,
+                'context_hook': '',
+                'reply_to_message_id': state['message_id'],
+            }
 
-        text = await read_model(light_model, model_input(state, HOOK_PROMPT))
-        approved, hook = decide_hook(text)
-        if not approved:
+        structured = light_model.with_structured_output(TriggerDecision)
+        decision = await structured.ainvoke(
+            model_input(state, trigger_instruction(state))
+        )
+        if not isinstance(decision, TriggerDecision):
+            raise TypeError(
+                f'Esperado TriggerDecision da LLM, recebido {type(decision).__name__}'
+            )
+        if decision.action == TriggerAction.SILENCE:
             return {
                 'approved': False,
                 'context_hook': '',
                 'final_response': '',
+                'reply_to_message_id': None,
             }
-        return {'approved': True, 'context_hook': hook}
+
+        reply_to = None
+        if decision.action == TriggerAction.REPLY:
+            reply_to = message_id_at(state, decision.message_index)
+        return {
+            'approved': True,
+            'context_hook': decision.hook,
+            'reply_to_message_id': reply_to,
+        }
 
     async def persona_router(state: BotState) -> dict[str, str]:
-        text = await read_model(light_model, model_input(state, PERSONA_PROMPT))
-        return {'persona_style': select_style(text)}
+        reply = await light_model.ainvoke(model_input(state, PERSONA_PROMPT))
+        return {'persona_style': select_style(_text(reply))}
 
     async def generate_response(state: BotState) -> dict[str, object]:
-        instruction = reply_prompt(state['persona_style'], state['context_hook'])
-        text = (await read_model(reply_model, model_input(state, instruction))).strip()
+        reply = await reply_model.ainvoke(model_input(state, reply_prompt(state)))
+        text = _text(reply).strip()
         return {
             'final_response': text,
             'messages': [AIMessage(content=text)],
         }
 
     return evaluate_trigger, persona_router, generate_response
+
+
+def _text(message: AIMessage) -> str:
+    content = message.content
+    if isinstance(content, str):
+        return content
+    return ''.join(part if isinstance(part, str) else str(part) for part in content)

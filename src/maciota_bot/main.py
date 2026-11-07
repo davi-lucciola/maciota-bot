@@ -5,7 +5,7 @@ from maciota_bot.config import settings
 from maciota_bot.db import create_db_engine
 from maciota_bot.events import on_member_join, on_message, on_ready
 from maciota_bot.logs import setup_logging
-from maciota_bot.state import AppState, configure
+from maciota_bot.state import AppState, configure, get_state
 
 
 def main() -> None:
@@ -21,6 +21,13 @@ def main() -> None:
     client.event(on_ready)
     client.event(on_message)
     client.event(on_member_join)
+    _close_client = client.close
+
+    async def _close() -> None:
+        await get_state().agent.aclose()
+        await _close_client()
+
+    client.close = _close
 
     client.run(settings.discord_token.get_secret_value(), log_handler=None)
 

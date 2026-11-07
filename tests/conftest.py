@@ -5,12 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from maciota_bot.db import create_db_engine
-from maciota_bot.state import AppState, configure
-from tests.support import IdleTree, release_engine
-
 # Importing maciota_bot.config builds Settings immediately.
 os.environ['DISCORD_TOKEN'] = 'test-token'
+os.environ['OPENROUTER_API_KEY'] = 'test-key'
+
+from maciota_bot.db import create_db_engine
+from maciota_bot.state import configure
+from tests.support import make_state, release_engine
 
 _KINDS = frozenset({'unit', 'integration'})
 
@@ -36,7 +37,7 @@ def record_bot_connected() -> Callable[[list[str]], logging.Handler]:
 @pytest.fixture(autouse=True)
 async def _reset_state() -> AsyncIterator[None]:
     engine = create_db_engine('sqlite:///:memory:')
-    configure(AppState(engine=engine, tree=IdleTree()))
+    configure(make_state(engine))
     yield
     await release_engine()
 

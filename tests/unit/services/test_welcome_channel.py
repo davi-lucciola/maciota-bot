@@ -6,14 +6,14 @@ from maciota_bot.services.welcome import (
     get_welcome_channel_id,
     set_welcome_channel,
 )
-from maciota_bot.state import AppState, configure, get_state
-from tests.support import IdleTree, release_engine
+from maciota_bot.state import configure, get_state
+from tests.support import make_state, release_engine
 
 
 async def _publish(database: Path) -> None:
     engine = create_db_engine(f'sqlite:///{database}')
     await init_db(engine)
-    configure(AppState(engine=engine, tree=IdleTree()))
+    configure(make_state(engine))
 
 
 async def test_missing_row_returns_none(tmp_path: Path) -> None:
@@ -48,7 +48,7 @@ async def test_saved_channel_survives_closing_and_opening_the_file(
     await release_engine()
 
     reopened = create_db_engine(f'sqlite:///{database}')
-    configure(AppState(engine=reopened, tree=IdleTree()))
+    configure(make_state(reopened))
 
     assert await get_welcome_channel_id(4) == 55
 

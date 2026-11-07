@@ -25,10 +25,25 @@ async def on_message(message: discord.Message) -> None:
     if message.author.bot:
         return
 
-    if message.content.strip().lower() != '!ping':
+    state = get_state()
+    user = state.client.user
+    trigger_type = (
+        'mention' if user is not None and user.mentioned_in(message) else 'proactive'
+    )
+    try:
+        text = await state.agent.execute(
+            channel_id=message.channel.id,
+            message_id=message.id,
+            author_name=message.author.display_name,
+            content=message.content,
+            trigger_type=trigger_type,
+        )
+    except Exception:
+        logger.exception('Falha ao responder no canal')
         return
 
-    await message.channel.send('pong')
+    if text.strip():
+        await message.channel.send(text)
 
 
 async def on_member_join(member: discord.Member) -> None:

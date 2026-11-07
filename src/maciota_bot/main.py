@@ -1,3 +1,4 @@
+from maciota_bot.agent import build_agent
 from maciota_bot.client import build_discord_client
 from maciota_bot.commands import build_command_tree
 from maciota_bot.config import settings
@@ -14,7 +15,7 @@ def main() -> None:
     client = build_discord_client()
     tree = build_command_tree(client)
 
-    state = AppState(engine=engine, tree=tree)
+    state = AppState(engine=engine, tree=tree, agent=build_agent(), client=client)
     configure(state=state)
 
     client.event(on_ready)

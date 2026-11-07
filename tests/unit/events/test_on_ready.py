@@ -7,7 +7,8 @@ from sqlalchemy import inspect
 from maciota_bot.db import create_db_engine
 from maciota_bot.events import on_ready
 from maciota_bot.models import GuildWelcomeChannel
-from maciota_bot.state import AppState, configure
+from maciota_bot.state import configure
+from tests.support import make_state
 
 
 class _Tree:
@@ -25,7 +26,7 @@ async def test_on_ready_syncs_then_logs(
 ) -> None:
     order: list[str] = []
     engine = create_db_engine(f'sqlite:///{tmp_path / "ready-log.db"}')
-    configure(AppState(engine=engine, tree=_Tree(order)))
+    configure(make_state(engine, tree=_Tree(order)))
     handler = record_bot_connected(order)
     events_logger = logging.getLogger('maciota_bot.events')
     events_logger.setLevel(logging.INFO)
@@ -42,7 +43,7 @@ async def test_on_ready_syncs_then_logs(
 async def test_on_ready_creates_the_welcome_table(tmp_path: Path) -> None:
     database = tmp_path / 'ready.db'
     engine = create_db_engine(f'sqlite:///{database}')
-    configure(AppState(engine=engine, tree=_Tree([])))
+    configure(make_state(engine, tree=_Tree([])))
 
     await on_ready()
 

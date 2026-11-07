@@ -5,6 +5,7 @@ from pathlib import Path
 import discord
 import pytest
 
+from maciota_bot.agent import Agent
 from maciota_bot.events import on_member_join, on_message, on_ready
 from maciota_bot.main import main
 from maciota_bot.services.welcome import WELCOME_TEMPLATES
@@ -23,13 +24,6 @@ class _Channel:
 
     async def send(self, content: str) -> None:
         self.sent.append(content)
-
-
-class _Message:
-    def __init__(self, content: str, *, bot: bool = False) -> None:
-        self.content = content
-        self.author = _Author(bot=bot)
-        self.channel = _Channel()
 
 
 class _Guild:
@@ -62,7 +56,7 @@ def _restore(*names: str) -> None:
         logger.setLevel(logging.NOTSET)
 
 
-async def test_main_logs_in_with_the_token_and_answers_ping(
+async def test_main_logs_in_with_the_token_and_publishes_the_agent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -89,12 +83,11 @@ async def test_main_logs_in_with_the_token_and_answers_ping(
         assert isinstance(client, discord.Client)
         assert get_state().engine is not None
         assert get_state().tree is client.tree
+        assert get_state().client is client
+        assert isinstance(get_state().agent, Agent)
         assert client.on_ready is on_ready
         assert client.on_message is on_message
         assert client.on_member_join is on_member_join
-        message = _Message('!ping')
-        await client.on_message(message)
-        assert message.channel.sent == ['pong']
     finally:
         await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')

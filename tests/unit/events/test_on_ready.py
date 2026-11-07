@@ -1,13 +1,13 @@
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import Callable
 from pathlib import Path
 
-import pytest
+from sqlalchemy import inspect
 
 from maciota_bot.db import create_db_engine
 from maciota_bot.events import on_ready
-from maciota_bot.services.welcome import get_welcome_channel_id
-from maciota_bot.state import AppState, configure, get_state
+from maciota_bot.models import GuildWelcomeChannel
+from maciota_bot.state import AppState, configure
 
 
 class _Tree:
@@ -17,16 +17,6 @@ class _Tree:
     async def sync(self) -> list[object]:
         self.order.append('sync')
         return []
-
-
-@pytest.fixture(autouse=True)
-async def _reset_state() -> AsyncIterator[None]:
-    configure(AppState())
-    yield
-    engine = get_state().engine
-    configure(AppState())
-    if engine is not None:
-        await engine.dispose()
 
 
 async def test_on_ready_logs_then_syncs(
@@ -55,4 +45,10 @@ async def test_on_ready_creates_the_welcome_table(tmp_path: Path) -> None:
     await on_ready()
 
     assert database.is_file()
-    assert await get_welcome_channel_id(1) is None
+
+    def table_names(sync_connection: object) -> list[str]:
+        return list(inspect(sync_connection).get_table_names())
+
+    async with engine.connect() as connection:
+        names = await connection.run_sync(table_names)
+    assert GuildWelcomeChannel.__tablename__ in names

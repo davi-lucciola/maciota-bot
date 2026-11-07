@@ -1,7 +1,4 @@
-from collections.abc import AsyncIterator
 from pathlib import Path
-
-import pytest
 
 from maciota_bot.db import create_db_engine, init_db
 from maciota_bot.services.welcome import (
@@ -10,16 +7,7 @@ from maciota_bot.services.welcome import (
     set_welcome_channel,
 )
 from maciota_bot.state import AppState, configure, get_state
-
-
-@pytest.fixture(autouse=True)
-async def _reset_state() -> AsyncIterator[None]:
-    configure(AppState())
-    yield
-    engine = get_state().engine
-    configure(AppState())
-    if engine is not None:
-        await engine.dispose()
+from tests.support import release_engine
 
 
 async def _publish(database: Path) -> None:
@@ -56,9 +44,8 @@ async def test_saved_channel_survives_closing_and_opening_the_file(
     await _publish(database)
     await set_welcome_channel(4, 55)
     opened = get_state().engine
-    configure(AppState())
     assert opened is not None
-    await opened.dispose()
+    await release_engine()
 
     reopened = create_db_engine(f'sqlite:///{database}')
     configure(AppState(engine=reopened))

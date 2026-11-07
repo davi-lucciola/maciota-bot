@@ -8,7 +8,8 @@ import pytest
 from maciota_bot.events import on_member_join, on_message, on_ready
 from maciota_bot.main import main
 from maciota_bot.services.welcome import WELCOME_TEMPLATES
-from maciota_bot.state import AppState, configure, get_state
+from maciota_bot.state import get_state
+from tests.support import release_engine
 
 
 class _Author:
@@ -49,13 +50,6 @@ class _Member:
         self.name = 'ada'
         self.bot = bot
         self.guild = _Guild(channel)
-
-
-async def _close_database() -> None:
-    engine = get_state().engine
-    configure(AppState())
-    if engine is not None:
-        await engine.dispose()
 
 
 def _restore(*names: str) -> None:
@@ -102,7 +96,7 @@ async def test_main_logs_in_with_the_token_and_answers_ping(
         await client.on_message(message)
         assert message.channel.sent == ['pong']
     finally:
-        await _close_database()
+        await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')
 
 
@@ -147,7 +141,7 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         assert channel.sent[0] in expected
         assert 'ada' not in channel.sent[0]
     finally:
-        await _close_database()
+        await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')
 
 
@@ -197,5 +191,5 @@ async def test_main_syncs_the_welcome_command_when_ready(
         assert command.get_parameter('canal') is not None
     finally:
         events_logger.removeHandler(handler)
-        await _close_database()
+        await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')

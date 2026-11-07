@@ -1,9 +1,12 @@
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 import pytest
+
+from maciota_bot.state import AppState, configure
+from tests.support import release_engine
 
 # Importing maciota_bot.config builds Settings immediately.
 os.environ['DISCORD_TOKEN'] = 'test-token'
@@ -27,6 +30,13 @@ def _record_bot_connected(order: list[str]) -> logging.Handler:
 @pytest.fixture
 def record_bot_connected() -> Callable[[list[str]], logging.Handler]:
     return _record_bot_connected
+
+
+@pytest.fixture(autouse=True)
+async def _reset_state() -> AsyncIterator[None]:
+    configure(AppState())
+    yield
+    await release_engine()
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

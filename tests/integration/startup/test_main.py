@@ -181,7 +181,7 @@ async def test_main_syncs_the_welcome_command_when_ready(
         assert isinstance(client, discord.Client)
         events_logger.addHandler(handler)
         await client.on_ready()
-        assert order == ['log', 'sync']
+        assert order == ['sync', 'log']
         command = client.tree.get_command('boas-vindas')
         assert command is not None
         assert command.name == 'boas-vindas'

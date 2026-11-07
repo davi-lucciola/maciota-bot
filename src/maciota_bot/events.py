@@ -14,13 +14,11 @@ logger = logging.getLogger(__name__)
 
 async def on_ready() -> None:
     state = get_state()
-    if state.engine is not None:
-        await init_db(state.engine)
+
+    await init_db(state.engine)
+    await state.tree.sync()
 
     logger.info('Bot conectado')
-    tree = state.tree
-    assert tree is not None
-    await tree.sync()
 
 
 async def on_message(message: discord.Message) -> None:

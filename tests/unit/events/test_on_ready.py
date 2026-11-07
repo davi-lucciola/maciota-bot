@@ -19,11 +19,13 @@ class _Tree:
         return []
 
 
-async def test_on_ready_logs_then_syncs(
+async def test_on_ready_syncs_then_logs(
     record_bot_connected: Callable[[list[str]], logging.Handler],
+    tmp_path: Path,
 ) -> None:
     order: list[str] = []
-    configure(AppState(tree=_Tree(order)))
+    engine = create_db_engine(f'sqlite:///{tmp_path / "ready-log.db"}')
+    configure(AppState(engine=engine, tree=_Tree(order)))
     handler = record_bot_connected(order)
     events_logger = logging.getLogger('maciota_bot.events')
     events_logger.setLevel(logging.INFO)
@@ -34,7 +36,7 @@ async def test_on_ready_logs_then_syncs(
         events_logger.removeHandler(handler)
         events_logger.setLevel(logging.NOTSET)
 
-    assert order == ['log', 'sync']
+    assert order == ['sync', 'log']
 
 
 async def test_on_ready_creates_the_welcome_table(tmp_path: Path) -> None:

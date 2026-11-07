@@ -1,5 +1,10 @@
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlmodel import SQLModel
+
+from maciota_bot.state import get_state
 
 
 def create_db_engine(database_url: str) -> AsyncEngine:
@@ -17,3 +22,11 @@ def _async_sqlite_url(database_url: str) -> str:
 async def init_db(engine: AsyncEngine) -> None:
     async with engine.begin() as connection:
         await connection.run_sync(SQLModel.metadata.create_all)
+
+
+@asynccontextmanager
+async def get_session() -> AsyncIterator[AsyncSession]:
+    state = get_state()
+
+    async with AsyncSession(state.engine) as session:
+        yield session

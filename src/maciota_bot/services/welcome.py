@@ -1,7 +1,7 @@
 import random
 
 import discord
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from maciota_bot.db import get_session
 from maciota_bot.models import GuildWelcomeChannel

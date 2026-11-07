@@ -14,7 +14,7 @@
 
 `agent` answers a channel message. `Agent.execute` runs the LangGraph for that channel and returns the text to send. The graph checkpoint is its own SQLite file. `get_session()` stays on the SQLModel tables.
 
-`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` creates the tables, logs that the bot connected, and syncs the command tree from state. `on_message` ignores a bot author and calls `Agent.execute`.
+`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` creates the tables, syncs the command tree, and then logs that the bot connected. `on_message` ignores a bot author and calls `Agent.execute`.
 
 `services/welcome` builds the welcome text, reads and writes a guild's welcome channel, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
 

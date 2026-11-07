@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 
-from maciota_bot.services.welcome_channel import define_welcome_channel
+from maciota_bot.services.welcome import define_welcome_channel
 
 
 def build_command_tree(client: discord.Client) -> app_commands.CommandTree:

@@ -14,11 +14,9 @@
 
 `events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` logs that the bot connected and syncs the command tree from state.
 
-`services/welcome_channel` reads and writes a guild's welcome channel and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
+`services/welcome` builds the welcome text, reads and writes a guild's welcome channel, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
 
-`services/welcome` builds the welcome text.
-
-An event that needs a saved channel asks `welcome_channel` for the id, then uses the Discord guild to resolve and send.
+An event that needs a saved channel asks `welcome` for the id, then uses the Discord guild to resolve and send.
 
 ## Verify
 

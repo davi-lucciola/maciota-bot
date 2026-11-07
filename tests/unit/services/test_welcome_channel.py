@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from maciota_bot.db import create_db_engine, init_db
-from maciota_bot.services.welcome_channel import (
+from maciota_bot.services.welcome import (
     define_welcome_channel,
     get_welcome_channel_id,
     set_welcome_channel,

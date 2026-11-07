@@ -2,8 +2,10 @@ import logging
 
 import discord
 
-from maciota_bot.services.welcome import build_welcome_message
-from maciota_bot.services.welcome_channel import get_welcome_channel_id
+from maciota_bot.services.welcome import (
+    build_welcome_message,
+    get_welcome_channel_id,
+)
 from maciota_bot.state import current
 
 logger = logging.getLogger(__name__)

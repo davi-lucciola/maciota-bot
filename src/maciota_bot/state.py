@@ -10,15 +10,15 @@ class AppState:
     tree: app_commands.CommandTree | None = None
 
 
-class _StateHolder:
-    current: AppState | None = None
+_state: AppState | None = None
 
 
 def get_state() -> AppState:
-    if _StateHolder.current is None:
+    if _state is None:
         raise RuntimeError('Application state is not configured')
-    return _StateHolder.current
+    return _state
 
 
 def configure(state: AppState) -> None:
-    _StateHolder.current = state
+    global _state  # noqa: PLW0603
+    _state = state

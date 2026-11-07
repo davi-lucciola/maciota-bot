@@ -1,5 +1,23 @@
 # maciota-bot
 
+## Architecture
+
+`main` composes the process. It configures logging, opens the database, builds the Discord client and the command tree, stores those shared instances, registers the event handlers, and starts the gateway.
+
+`state` holds the shared instances the rest of the process reads: the SQLAlchemy engine and the command tree. `main` writes this state before `client.run`. Services and events read it with `current()`. A test that needs the engine or the tree publishes an `AppState` and clears it afterwards. Replacing the state disposes the previous engine.
+
+`db` opens the engine and creates the tables.
+
+`models` defines the tables.
+
+`commands` registers slash-command entrypoints. A handler calls a service and returns.
+
+`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` logs that the bot connected and syncs the command tree from state.
+
+`services/welcome` builds the welcome text, reads and writes a guild's welcome channel, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
+
+An event that needs a saved channel asks `welcome` for the id, then uses the Discord guild to resolve and send.
+
 ## Verify
 
 When you change Python under `src/` or `tests/`:
@@ -19,6 +37,6 @@ A test under `tests/unit/<domain>/` exercises one module through its public func
 
 A test under `tests/integration/<domain>/` boots real composition: logging handlers, or `main` with the gateway replaced.
 
-`tests/conftest.py` marks each test `unit` or `integration` from its directory, and marks the domain from the next directory (`client`, `config`, `events`, `logs`, `startup`). Add the marker in `pyproject.toml` when you add a domain directory.
+`tests/conftest.py` marks each test `unit` or `integration` from its directory, and marks the domain from the next directory (`client`, `config`, `events`, `logs`, `services`, `startup`, `state`). Add the marker in `pyproject.toml` when you add a domain directory.
 
 `tests/conftest.py` sets `DISCORD_TOKEN` before the suite imports `maciota_bot.config`. A test that needs another token sets the environment and constructs `Settings()` itself.

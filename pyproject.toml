@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "discord-py>=2.7.1",
     "pydantic-settings>=2.16.2",
+    "sqlmodel>=0.0.48",
 ]
 
 [project.scripts]
@@ -45,16 +46,17 @@ pythonpath = ["src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_default_test_loop_scope = "function"
-addopts = "--strict-markers"
+addopts = "--strict-markers --import-mode=importlib"
 markers = [
     "unit: testes unitários (tests/unit)",
     "integration: testes de integração (tests/integration)",
     "client: construção do cliente Discord",
     "config: leitura do token",
     "events: eventos de ready, message e entrada de membro",
-    "services: texto de boas-vindas",
+    "services: texto de boas-vindas e canal configurado",
     "logs: formatação e configuração de logs",
     "startup: arranque do processo",
+    "state: engine e árvore compartilhados",
 ]
 
 [tool.coverage.run]

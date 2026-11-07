@@ -1,4 +1,6 @@
+import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -7,6 +9,24 @@ import pytest
 os.environ['DISCORD_TOKEN'] = 'test-token'
 
 _KINDS = frozenset({'unit', 'integration'})
+
+
+def _record_bot_connected(order: list[str]) -> logging.Handler:
+    class _ConnectedHandler(logging.Handler):
+        def __init__(self) -> None:
+            super().__init__()
+            self.order = order
+
+        def emit(self, record: logging.LogRecord) -> None:
+            if record.getMessage() == 'Bot conectado':
+                self.order.append('log')
+
+    return _ConnectedHandler()
+
+
+@pytest.fixture
+def record_bot_connected() -> Callable[[list[str]], logging.Handler]:
+    return _record_bot_connected
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

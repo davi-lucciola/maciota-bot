@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     )
 
     discord_token: SecretStr
+    database_url: str = 'sqlite:///maciota.db'
 
 
 settings = Settings()

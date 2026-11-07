@@ -4,7 +4,7 @@
 
 `main` composes the process. It configures logging, opens the async database engine, builds the Discord client and the command tree, stores those shared instances, registers the event handlers, and starts the gateway.
 
-`state` holds the shared instances the rest of the process reads: the async SQLAlchemy engine and the command tree. `main` creates that engine once and writes this state before `client.run`. Services and events read it with `get_state()`. A test that needs the engine or the tree publishes an `AppState` and clears it afterwards.
+`state` holds the shared instances the rest of the process reads: the async SQLAlchemy engine, the command tree, the Discord client, and the `Agent`. `main` creates them once and writes this state before `client.run`. Services and events read it with `get_state()`. A test that needs one of them publishes an `AppState` and clears it afterwards.
 
 `db` opens the async engine through aiosqlite. `on_ready` creates the tables on the Discord event loop.
 
@@ -12,7 +12,9 @@
 
 `commands` registers slash-command entrypoints. A handler calls a service and returns.
 
-`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` creates the tables, logs that the bot connected, and syncs the command tree from state.
+`agent` answers a channel message. `Agent.execute` runs the LangGraph for that channel and returns the text to send. The graph checkpoint is its own SQLite file. `get_session()` stays on the SQLModel tables.
+
+`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` creates the tables, syncs the command tree, and then logs that the bot connected. `on_message` ignores a bot author and calls `Agent.execute`.
 
 `services/welcome` builds the welcome text, reads and writes a guild's welcome channel, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
 

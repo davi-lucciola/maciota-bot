@@ -53,11 +53,9 @@ markers = [
     "client: construção do cliente Discord",
     "config: leitura do token",
     "events: eventos de ready, message e entrada de membro",
-    "services: texto de boas-vindas",
+    "services: texto de boas-vindas e canal configurado",
     "logs: formatação e configuração de logs",
     "startup: arranque do processo",
-    "db: persistência do canal de boas-vindas",
-    "commands: comando de canal de boas-vindas",
 ]
 
 [tool.coverage.run]

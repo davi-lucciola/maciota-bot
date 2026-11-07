@@ -4,9 +4,10 @@ from pathlib import Path
 import discord
 import pytest
 
-from maciota_bot.db import configure_engine
+from maciota_bot.events import on_member_join, on_message, on_ready
 from maciota_bot.main import main
 from maciota_bot.services.welcome import WELCOME_TEMPLATES
+from maciota_bot.state import AppState, configure, current
 
 
 class _Author:
@@ -50,7 +51,7 @@ class _Member:
 
 
 def _close_database() -> None:
-    configure_engine(None)
+    configure(AppState())
 
 
 def _restore(*names: str) -> None:
@@ -88,6 +89,11 @@ async def test_main_logs_in_with_the_token_and_answers_ping(
         assert captured['log_handler'] is None
         client = captured['client']
         assert isinstance(client, discord.Client)
+        assert current().engine is not None
+        assert current().tree is client.tree
+        assert client.on_ready is on_ready
+        assert client.on_message is on_message
+        assert client.on_member_join is on_member_join
         message = _Message('!ping')
         await client.on_message(message)
         assert message.channel.sent == ['pong']

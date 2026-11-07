@@ -56,6 +56,7 @@ markers = [
     "services: texto de boas-vindas e canal configurado",
     "logs: formatação e configuração de logs",
     "startup: arranque do processo",
+    "state: engine e árvore compartilhados",
 ]
 
 [tool.coverage.run]

@@ -1,13 +1,8 @@
 import logging
-from collections.abc import Iterator
-from pathlib import Path
 
 import pytest
 
-from maciota_bot.db import create_db_engine, init_db
 from maciota_bot.events import on_member_join
-from maciota_bot.services.welcome_channel import set_welcome_channel
-from maciota_bot.state import AppState, configure
 
 
 class _Channel:
@@ -50,22 +45,18 @@ class _Member:
         self.guild = _Guild(channel, guild_id=guild_id, channels=channels)
 
 
-@pytest.fixture(autouse=True)
-def _reset_state() -> Iterator[None]:
-    configure(AppState())
-    yield
-    configure(AppState())
+def _saved_channel(
+    monkeypatch: pytest.MonkeyPatch,
+    channel_id: int | None,
+) -> None:
+    def read(guild_id: int) -> int | None:
+        return channel_id
 
-
-def _use_database(tmp_path: Path) -> None:
-    engine = create_db_engine(f'sqlite:///{tmp_path / "welcome.db"}')
-    init_db(engine)
-    configure(AppState(engine=engine))
+    monkeypatch.setattr('maciota_bot.events.get_welcome_channel_id', read)
 
 
 async def test_bot_member_sends_nothing(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
 ) -> None:
     def fail_message(user_name: str) -> str:
         raise AssertionError(user_name)
@@ -75,7 +66,6 @@ async def test_bot_member_sends_nothing(
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail_message)
     monkeypatch.setattr('maciota_bot.events.get_welcome_channel_id', fail_read)
-    _use_database(tmp_path)
     channel = _Channel()
     member = _Member('<@42>', bot=True, channel=channel)
 
@@ -94,6 +84,7 @@ async def test_member_join_sends_the_service_message(
         return 'oi ada'
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
+    _saved_channel(monkeypatch, None)
     channel = _Channel()
     member = _Member('<@42>', bot=False, channel=channel)
 
@@ -105,13 +96,12 @@ async def test_member_join_sends_the_service_message(
 
 async def test_no_saved_channel_uses_system_channel(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
 ) -> None:
     def build(user_name: str) -> str:
         return 'oi ada'
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
-    _use_database(tmp_path)
+    _saved_channel(monkeypatch, None)
     channel = _Channel()
     member = _Member('<@42>', bot=False, channel=channel, guild_id=5)
 
@@ -122,16 +112,14 @@ async def test_no_saved_channel_uses_system_channel(
 
 async def test_saved_channel_receives_the_welcome(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
 ) -> None:
     def build(user_name: str) -> str:
         return 'oi ada'
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
-    _use_database(tmp_path)
+    _saved_channel(monkeypatch, 99)
     system = _Channel()
     welcome = _Channel()
-    set_welcome_channel(5, 99)
     member = _Member(
         '<@42>',
         bot=False,
@@ -148,15 +136,13 @@ async def test_saved_channel_receives_the_welcome(
 
 async def test_missing_saved_channel_falls_back_to_system_channel(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     def build(user_name: str) -> str:
         return 'oi ada'
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
-    _use_database(tmp_path)
-    set_welcome_channel(5, 99)
+    _saved_channel(monkeypatch, 99)
     caplog.set_level(logging.WARNING, logger='maciota_bot.events')
     system = _Channel()
     member = _Member('<@42>', bot=False, channel=system, guild_id=5, channels={})
@@ -169,15 +155,13 @@ async def test_missing_saved_channel_falls_back_to_system_channel(
 
 async def test_missing_saved_and_system_channels_log_and_send_nothing(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     def fail(user_name: str) -> str:
         raise AssertionError(user_name)
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail)
-    _use_database(tmp_path)
-    set_welcome_channel(5, 99)
+    _saved_channel(monkeypatch, 99)
     caplog.set_level(logging.WARNING, logger='maciota_bot.events')
     member = _Member('<@42>', bot=False, channel=None, guild_id=5, channels={})
 
@@ -197,6 +181,7 @@ async def test_missing_system_channel_logs_and_sends_nothing(
         raise AssertionError(user_name)
 
     monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail)
+    _saved_channel(monkeypatch, None)
     caplog.set_level(logging.WARNING, logger='maciota_bot.events')
     member = _Member('<@42>', bot=False, channel=None)
 

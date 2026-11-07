@@ -39,6 +39,6 @@ A test under `tests/unit/<domain>/` exercises one module through its public func
 
 A test under `tests/integration/<domain>/` boots real composition: logging handlers, or `main` with the gateway replaced.
 
-`tests/conftest.py` marks each test `unit` or `integration` from its directory, and marks the domain from the next directory (`client`, `config`, `events`, `logs`, `services`, `startup`). Add the marker in `pyproject.toml` when you add a domain directory.
+`tests/conftest.py` marks each test `unit` or `integration` from its directory, and marks the domain from the next directory (`client`, `config`, `events`, `logs`, `services`, `startup`, `state`). Add the marker in `pyproject.toml` when you add a domain directory.
 
 `tests/conftest.py` sets `DISCORD_TOKEN` before the suite imports `maciota_bot.config`. A test that needs another token sets the environment and constructs `Settings()` itself.

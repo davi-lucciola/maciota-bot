@@ -60,16 +60,6 @@ def test_saved_channel_survives_closing_and_opening_the_file(
     assert get_welcome_channel_id(4) == 55
 
 
-def test_replacing_the_state_disposes_the_previous_engine(tmp_path: Path) -> None:
-    engine = create_db_engine(f'sqlite:///{tmp_path / "welcome.db"}')
-    pool = engine.pool
-    configure(AppState(engine=engine))
-
-    configure(AppState())
-
-    assert engine.pool is not pool
-
-
 def test_missing_engine_returns_none() -> None:
     assert get_welcome_channel_id(1) is None
 

@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import discord
@@ -141,6 +142,7 @@ async def test_main_sends_a_welcome_when_a_member_joins(
 async def test_main_syncs_the_welcome_command_when_ready(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    record_bot_connected: Callable[[list[str]], logging.Handler],
 ) -> None:
     monkeypatch.chdir(tmp_path)
     captured: dict[str, object] = {}
@@ -162,18 +164,9 @@ async def test_main_syncs_the_welcome_command_when_ready(
         order.append('sync')
         return []
 
-    class _Handler(logging.Handler):
-        def __init__(self, events: list[str]) -> None:
-            super().__init__()
-            self.events = events
-
-        def emit(self, record: logging.LogRecord) -> None:
-            if record.getMessage() == 'Bot conectado':
-                self.events.append('log')
-
     monkeypatch.setattr(discord.Client, 'run', run)
     monkeypatch.setattr(discord.app_commands.CommandTree, 'sync', sync)
-    handler = _Handler(order)
+    handler = record_bot_connected(order)
     events_logger = logging.getLogger('maciota_bot.events')
     try:
         main()

@@ -5,12 +5,19 @@ from maciota_bot.models import GuildWelcomeChannel
 from maciota_bot.state import current
 
 
+def _find_welcome_row(
+    session: Session,
+    guild_id: int,
+) -> GuildWelcomeChannel | None:
+    return session.get(GuildWelcomeChannel, guild_id)
+
+
 def get_welcome_channel_id(guild_id: int) -> int | None:
     engine = current().engine
     if engine is None:
         return None
     with Session(engine) as session:
-        row = session.get(GuildWelcomeChannel, guild_id)
+        row = _find_welcome_row(session, guild_id)
         if row is None:
             return None
         return row.channel_id
@@ -21,7 +28,7 @@ def set_welcome_channel(guild_id: int, channel_id: int) -> None:
     if engine is None:
         raise RuntimeError('Database engine is not configured')
     with Session(engine) as session:
-        row = session.get(GuildWelcomeChannel, guild_id)
+        row = _find_welcome_row(session, guild_id)
         if row is None:
             session.add(
                 GuildWelcomeChannel(guild_id=guild_id, channel_id=channel_id),

@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import pytest
 
@@ -16,16 +16,6 @@ class _Tree:
         return []
 
 
-class _Handler(logging.Handler):
-    def __init__(self, order: list[str]) -> None:
-        super().__init__()
-        self.order = order
-
-    def emit(self, record: logging.LogRecord) -> None:
-        if record.getMessage() == 'Bot conectado':
-            self.order.append('log')
-
-
 @pytest.fixture(autouse=True)
 def _reset_state() -> Iterator[None]:
     configure(AppState())
@@ -33,10 +23,12 @@ def _reset_state() -> Iterator[None]:
     configure(AppState())
 
 
-async def test_on_ready_logs_then_syncs() -> None:
+async def test_on_ready_logs_then_syncs(
+    record_bot_connected: Callable[[list[str]], logging.Handler],
+) -> None:
     order: list[str] = []
     configure(AppState(tree=_Tree(order)))
-    handler = _Handler(order)
+    handler = record_bot_connected(order)
     events_logger = logging.getLogger('maciota_bot.events')
     events_logger.setLevel(logging.INFO)
     events_logger.addHandler(handler)

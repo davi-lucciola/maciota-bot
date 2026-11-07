@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
@@ -9,59 +9,65 @@ from maciota_bot.services.welcome import (
     get_welcome_channel_id,
     set_welcome_channel,
 )
-from maciota_bot.state import AppState, configure
+from maciota_bot.state import AppState, configure, get_state
 
 
 @pytest.fixture(autouse=True)
-def _reset_state() -> Iterator[None]:
+async def _reset_state() -> AsyncIterator[None]:
     configure(AppState())
     yield
+    engine = get_state().engine
     configure(AppState())
+    if engine is not None:
+        await engine.dispose()
 
 
-def _publish(database: Path) -> None:
+async def _publish(database: Path) -> None:
     engine = create_db_engine(f'sqlite:///{database}')
-    init_db(engine)
+    await init_db(engine)
     configure(AppState(engine=engine))
 
 
-def test_missing_row_returns_none(tmp_path: Path) -> None:
-    _publish(tmp_path / 'welcome.db')
+async def test_missing_row_returns_none(tmp_path: Path) -> None:
+    await _publish(tmp_path / 'welcome.db')
 
-    assert get_welcome_channel_id(1) is None
+    assert await get_welcome_channel_id(1) is None
 
 
-def test_set_writes_and_replaces_the_channel_for_the_same_guild(
+async def test_set_writes_and_replaces_the_channel_for_the_same_guild(
     tmp_path: Path,
 ) -> None:
-    _publish(tmp_path / 'welcome.db')
+    await _publish(tmp_path / 'welcome.db')
 
-    set_welcome_channel(7, 100)
-    set_welcome_channel(8, 300)
-    assert get_welcome_channel_id(7) == 100
+    await set_welcome_channel(7, 100)
+    await set_welcome_channel(8, 300)
+    assert await get_welcome_channel_id(7) == 100
 
-    set_welcome_channel(7, 200)
+    await set_welcome_channel(7, 200)
 
-    assert get_welcome_channel_id(7) == 200
-    assert get_welcome_channel_id(8) == 300
+    assert await get_welcome_channel_id(7) == 200
+    assert await get_welcome_channel_id(8) == 300
 
 
-def test_saved_channel_survives_closing_and_opening_the_file(
+async def test_saved_channel_survives_closing_and_opening_the_file(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / 'welcome.db'
-    _publish(database)
-    set_welcome_channel(4, 55)
+    await _publish(database)
+    await set_welcome_channel(4, 55)
+    opened = get_state().engine
     configure(AppState())
+    assert opened is not None
+    await opened.dispose()
 
     reopened = create_db_engine(f'sqlite:///{database}')
     configure(AppState(engine=reopened))
 
-    assert get_welcome_channel_id(4) == 55
+    assert await get_welcome_channel_id(4) == 55
 
 
-def test_missing_engine_returns_none() -> None:
-    assert get_welcome_channel_id(1) is None
+async def test_missing_engine_returns_none() -> None:
+    assert await get_welcome_channel_id(1) is None
 
 
 class _Permissions:
@@ -106,7 +112,7 @@ class _Interaction:
 
 
 async def test_administrator_writes_the_channel(tmp_path: Path) -> None:
-    _publish(tmp_path / 'welcome.db')
+    await _publish(tmp_path / 'welcome.db')
     guild = _Guild(7)
     canal = _Channel(99, guild)
     guild.channels[canal.id] = canal
@@ -114,14 +120,14 @@ async def test_administrator_writes_the_channel(tmp_path: Path) -> None:
 
     await define_welcome_channel(interaction, canal)
 
-    assert get_welcome_channel_id(7) == 99
+    assert await get_welcome_channel_id(7) == 99
     assert interaction.response.messages == [
         ('Canal de boas-vindas definido para <#99>.', True),
     ]
 
 
 async def test_non_administrator_does_not_write(tmp_path: Path) -> None:
-    _publish(tmp_path / 'welcome.db')
+    await _publish(tmp_path / 'welcome.db')
     guild = _Guild(7)
     canal = _Channel(99, guild)
     guild.channels[canal.id] = canal
@@ -129,21 +135,21 @@ async def test_non_administrator_does_not_write(tmp_path: Path) -> None:
 
     await define_welcome_channel(interaction, canal)
 
-    assert get_welcome_channel_id(7) is None
+    assert await get_welcome_channel_id(7) is None
     assert interaction.response.messages == [
         ('Só administradores podem definir o canal de boas-vindas.', True),
     ]
 
 
 async def test_channel_absent_from_the_guild_does_not_write(tmp_path: Path) -> None:
-    _publish(tmp_path / 'welcome.db')
+    await _publish(tmp_path / 'welcome.db')
     guild = _Guild(7)
     canal = _Channel(99, guild)
     interaction = _Interaction(guild, administrator=True)
 
     await define_welcome_channel(interaction, canal)
 
-    assert get_welcome_channel_id(7) is None
+    assert await get_welcome_channel_id(7) is None
     assert interaction.response.messages == [
         ('Esse canal não existe neste servidor.', True),
     ]

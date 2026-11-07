@@ -1,10 +1,10 @@
 import random
 
 import discord
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from maciota_bot.models import GuildWelcomeChannel
-from maciota_bot.state import current
+from maciota_bot.state import get_state
 
 WELCOME_TEMPLATES: tuple[str, ...] = (
     '{user_name} entrou. Esconde o controle antes que peça.',
@@ -23,37 +23,37 @@ def build_welcome_message(user_name: str) -> str:
     return template.replace('{user_name}', user_name)
 
 
-def _find_welcome_row(
-    session: Session,
+async def _find_welcome_row(
+    session: AsyncSession,
     guild_id: int,
 ) -> GuildWelcomeChannel | None:
-    return session.get(GuildWelcomeChannel, guild_id)
+    return await session.get(GuildWelcomeChannel, guild_id)
 
 
-def get_welcome_channel_id(guild_id: int) -> int | None:
-    engine = current().engine
+async def get_welcome_channel_id(guild_id: int) -> int | None:
+    engine = get_state().engine
     if engine is None:
         return None
-    with Session(engine) as session:
-        row = _find_welcome_row(session, guild_id)
+    async with AsyncSession(engine) as session:
+        row = await _find_welcome_row(session, guild_id)
         if row is None:
             return None
         return row.channel_id
 
 
-def set_welcome_channel(guild_id: int, channel_id: int) -> None:
-    engine = current().engine
+async def set_welcome_channel(guild_id: int, channel_id: int) -> None:
+    engine = get_state().engine
     if engine is None:
         raise RuntimeError('Database engine is not configured')
-    with Session(engine) as session:
-        row = _find_welcome_row(session, guild_id)
+    async with AsyncSession(engine) as session:
+        row = await _find_welcome_row(session, guild_id)
         if row is None:
             session.add(
                 GuildWelcomeChannel(guild_id=guild_id, channel_id=channel_id),
             )
         else:
             row.channel_id = channel_id
-        session.commit()
+        await session.commit()
 
 
 async def define_welcome_channel(
@@ -74,7 +74,7 @@ async def define_welcome_channel(
         await _reply(interaction, 'Esse canal não existe neste servidor.')
         return
 
-    set_welcome_channel(guild.id, canal.id)
+    await set_welcome_channel(guild.id, canal.id)
     await _reply(
         interaction,
         f'Canal de boas-vindas definido para {canal.mention}.',

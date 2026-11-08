@@ -1,3 +1,5 @@
+from typing import cast
+
 import discord
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -12,28 +14,14 @@ async def _find_acidity_row(
     return await session.get(GuildAcidity, guild_id)
 
 
-def _known_level(level: str) -> Acidity | None:
-    if level == 'mild':
-        return 'mild'
-    if level == 'medium':
-        return 'medium'
-    if level == 'sharp':
-        return 'sharp'
-    return None
-
-
 async def get_acidity(guild_id: int) -> Acidity:
     async with get_session() as session:
         row = await _find_acidity_row(session, guild_id)
 
-    if row is None:
-        return 'medium'
+        if row is None:
+            return 'medium'
 
-    known = _known_level(row.level)
-    if known is None:
-        return 'medium'
-
-    return known
+        return cast(Acidity, row.level)
 
 
 async def set_acidity(guild_id: int, level: Acidity) -> None:
@@ -49,7 +37,7 @@ async def set_acidity(guild_id: int, level: Acidity) -> None:
         await session.commit()
 
 
-async def define_acidity(interaction: discord.Interaction, level: str) -> None:
+async def define_acidity(interaction: discord.Interaction, level: Acidity) -> None:
     guild = interaction.guild
     assert guild is not None
 
@@ -57,11 +45,8 @@ async def define_acidity(interaction: discord.Interaction, level: str) -> None:
         await _reply(interaction, 'Only administrators can set the acidity.')
         return
 
-    known = _known_level(level)
-    assert known is not None
-
-    await set_acidity(guild.id, known)
-    await _reply(interaction, f'Acidity set to {known}.')
+    await set_acidity(guild.id, level)
+    await _reply(interaction, f'Acidity set to {level}.')
 
 
 async def _reply(interaction: discord.Interaction, content: str) -> None:

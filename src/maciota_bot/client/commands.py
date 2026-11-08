@@ -1,3 +1,5 @@
+from typing import Literal
+
 import discord
 from discord import app_commands
 
@@ -36,7 +38,7 @@ def build_command_tree(client: discord.Client) -> app_commands.CommandTree:
     @app_commands.choices(level=_ACIDITY_CHOICES)
     async def acidity(
         interaction: discord.Interaction,
-        level: str,
+        level: Literal['mild', 'medium', 'sharp'],
     ) -> None:
         await define_acidity(interaction, level)
 

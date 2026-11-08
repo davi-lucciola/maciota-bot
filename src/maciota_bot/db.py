@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -26,7 +26,7 @@ async def init_db(engine: AsyncEngine) -> None:
 
 
 @asynccontextmanager
-async def get_session() -> AsyncIterator[AsyncSession]:
+async def get_session() -> AsyncGenerator[AsyncSession]:
     state = get_state()
 
     async with AsyncSession(state.engine) as session:

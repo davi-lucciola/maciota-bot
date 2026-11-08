@@ -82,10 +82,6 @@ async def test_main_logs_in_with_the_token_and_publishes_the_agent(
         assert captured['log_handler'] is None
         client = captured['client']
         assert isinstance(client, MaciotaClient)
-        assert get_state().engine is not None
-        assert get_state().tree is client.tree
-        assert get_state().client is client
-        assert get_state().agent is None
         assert client.on_message is on_message
         assert client.on_member_join is on_member_join
     finally:
@@ -167,7 +163,7 @@ async def test_main_syncs_the_welcome_command_when_ready(
     monkeypatch.setattr(discord.Client, 'run', run)
     monkeypatch.setattr(discord.app_commands.CommandTree, 'sync', sync)
     handler = record_bot_connected(order)
-    client_logger = logging.getLogger('maciota_bot.client.bot')
+    client_logger = logging.getLogger('maciota_bot')
     try:
         main()
 

@@ -3,15 +3,6 @@ from maciota_bot.state import AppState, get_state
 _disposed: set[int] = set()
 
 
-class IdleTree:
-    def __init__(self) -> None:
-        self.synced = False
-
-    async def sync(self) -> list[object]:
-        self.synced = True
-        return []
-
-
 class IdleAgent:
     def __init__(self) -> None:
         self.calls: list[object] = []
@@ -37,13 +28,11 @@ class IdleClient:
 
 def make_state(
     engine: object,
-    tree: object | None = None,
     agent: object | None = None,
     client: object | None = None,
 ) -> AppState:
     return AppState(
         engine=engine,
-        tree=IdleTree() if tree is None else tree,
         agent=IdleAgent() if agent is None else agent,
         client=IdleClient() if client is None else client,
     )

@@ -68,7 +68,7 @@ class _Agent:
 
 def _publish(agent: _Agent) -> None:
     current = get_state()
-    configure(make_state(current.engine, tree=current.tree, agent=agent))
+    configure(make_state(current.engine, agent=agent))
 
 
 def _turn(*, trigger_type: str, content: str) -> AgentInput:

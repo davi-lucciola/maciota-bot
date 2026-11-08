@@ -50,9 +50,7 @@ async def test_close_shuts_down_the_agent_then_the_gateway(
     monkeypatch.setattr(discord.Client, 'close', gateway_close)
     client = MaciotaClient()
     current = get_state()
-    configure(
-        make_state(current.engine, tree=client.tree, agent=_Agent(), client=client)
-    )
+    configure(make_state(current.engine, agent=_Agent(), client=client))
 
     await client.close()
 

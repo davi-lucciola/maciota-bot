@@ -6,13 +6,13 @@ Maciota is a Discord bot that sits in a guild channel and talks like another mem
 
 ## What it does
 
-Maciota only reads messages in a guild text channel. It ignores other bots and direct messages.
+Maciota reads guild messages. It ignores other bots and direct messages.
 
-It stays quiet unless someone is talking to it — by name, by mention, or by replying to it — or a line is absurd enough that it has not already commented. When it answers a person, the message is a reply to that person's message.
+It speaks Brazilian Portuguese and stays quiet by default. A mention makes it reply to that message. Otherwise it joins when someone addresses him by name or with an insult, or when a line is absurd enough that he has not already commented. When it answers a person, the message is a reply to that person's message.
 
 A new member who is not a bot gets a short joke in Brazilian Portuguese. The message goes to the channel saved for that server. If none is saved, it goes to the server's system channel. If that channel is also missing, nothing is sent.
 
-An administrator sets the welcome channel with `/boas-vindas` and a text channel in the same server. The confirmation is ephemeral. Anyone who is not an administrator, or a channel from another server, gets a refusal.
+`/boas-vindas` only runs in a server. An administrator sets the welcome channel with that command and a text channel in the same server. The confirmation is ephemeral. Anyone who is not an administrator, or a channel from another server, gets a refusal.
 
 ## Requirements
 
@@ -21,7 +21,7 @@ An administrator sets the welcome channel with `/boas-vindas` and a text channel
 - A Discord bot token
 - An [OpenRouter](https://openrouter.ai/) API key, used for channel replies
 
-In the Discord developer portal, enable the privileged **Message Content** and **Server Members** intents. The bot asks for both when it connects. Invite it to the server with permission to read and send messages and to register slash commands.
+In the Discord developer portal, enable the privileged **Message Content** and **Server Members** intents. The bot asks for both when it connects.
 
 ## Configure
 

@@ -6,13 +6,13 @@ O Maciota é um bot de Discord que fica num canal do servidor e fala como mais u
 
 ## O que ele faz
 
-O Maciota só lê mensagens num canal de texto do servidor. Ele ignora outros bots e mensagens diretas.
+O Maciota lê mensagens do servidor. Ele ignora outros bots e mensagens diretas.
 
-Ele fica quieto, a menos que alguém fale com ele — pelo nome, por menção ou respondendo a ele — ou que surja uma fala absurda que ele ainda não comentou. Quando responde a uma pessoa, a mensagem é uma resposta à mensagem dessa pessoa.
+Ele fala português do Brasil e fica quieto por padrão. Uma menção faz ele responder àquela mensagem. Fora isso, ele entra quando alguém se dirige a ele pelo nome ou com um xingamento, ou quando surge uma fala absurda que ele ainda não comentou. Quando responde a uma pessoa, a mensagem é uma resposta à mensagem dessa pessoa.
 
 Quem entra e não é bot recebe uma piada curta em português do Brasil. A mensagem vai para o canal salvo daquele servidor. Se nenhum foi salvo, vai para o canal de sistema. Se esse canal também não existir, nada é enviado.
 
-Um administrador define o canal de boas-vindas com `/boas-vindas` e um canal de texto do mesmo servidor. A confirmação é efêmera. Quem não é administrador, ou um canal de outro servidor, recebe uma recusa.
+`/boas-vindas` só funciona num servidor. Um administrador define o canal de boas-vindas com esse comando e um canal de texto do mesmo servidor. A confirmação é efêmera. Quem não é administrador, ou um canal de outro servidor, recebe uma recusa.
 
 ## Requisitos
 
@@ -21,7 +21,7 @@ Um administrador define o canal de boas-vindas com `/boas-vindas` e um canal de 
 - Um token de bot do Discord
 - Uma chave de API da [OpenRouter](https://openrouter.ai/), usada nas respostas no canal
 
-No portal de desenvolvedor do Discord, ative os intents privilegiados **Message Content** e **Server Members**. O bot pede os dois ao conectar. Convide-o para o servidor com permissão de ler e enviar mensagens e de registrar comandos de barra.
+No portal de desenvolvedor do Discord, ative os intents privilegiados **Message Content** e **Server Members**. O bot pede os dois ao conectar.
 
 ## Configuração
 

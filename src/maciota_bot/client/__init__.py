@@ -1,4 +1,5 @@
 import logging
+import os
 
 import discord
 
@@ -41,6 +42,23 @@ class MaciotaClient(discord.Client):
         await self.tree.sync()
 
         logger.info('Maciota está na atividade, conectado.')
+
+    async def on_error(
+        self,
+        event_method: str,
+        /,
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        if event_method != 'on_ready':
+            await super().on_error(event_method, *args, **kwargs)
+            return
+
+        for name in ('maciota_bot', 'discord'):
+            logging.getLogger(name).exception('Falha no on_ready.')
+            for handler in logging.getLogger(name).handlers:
+                handler.flush()
+        os._exit(1)
 
     async def close(self) -> None:
         state = get_state()

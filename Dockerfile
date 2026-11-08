@@ -25,6 +25,5 @@ RUN chown maciota:maciota /app
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-USER maciota
-
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "maciota_bot.entrypoint"]
 CMD ["maciota-bot"]

@@ -220,7 +220,7 @@ async def test_model_sees_only_the_last_thirty_messages() -> None:
 async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
     light = ScriptedModel(['ironia curta'])
     reply = ScriptedModel(['ok'])
-    connection = await aiosqlite.connect(tmp_path / 'checkpoints.sqlite')
+    connection = await aiosqlite.connect(tmp_path / 'checkpoints.db')
     saver = AsyncSqliteSaver(connection)
     await saver.setup()
     agent = Agent(light_model=light, reply_model=reply, checkpointer=saver)

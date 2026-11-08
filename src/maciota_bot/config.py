@@ -9,12 +9,12 @@ class Settings(BaseSettings):
     )
 
     discord_token: SecretStr
-    database_url: str = 'sqlite:///maciota.db'
+    database_url: str = 'sqlite:///data/maciota.db'
     openrouter_api_url: str = 'https://openrouter.ai/api/v1'
     openrouter_api_key: SecretStr = SecretStr('')
     llm_model: str = 'openai/gpt-4o-mini'
     llm_light_model: str = 'openai/gpt-4o-mini'
-    checkpoint_path: str = 'checkpoints.sqlite'
+    checkpoint_path: str = 'data/checkpoints.db'
 
 
 settings = Settings()

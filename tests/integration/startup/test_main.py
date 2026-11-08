@@ -120,7 +120,7 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         assert isinstance(client, MaciotaClient)
         await client.on_ready()
         assert isinstance(get_state().agent, Agent)
-        assert (tmp_path / 'maciota.db').is_file()
+        assert (tmp_path / 'data' / 'maciota.db').is_file()
         channel = _Channel()
         member = _Member('<@42>', channel=channel)
         await client.on_member_join(member)

@@ -7,7 +7,7 @@ from maciota_bot.agent import build_agent
 from maciota_bot.client.commands import build_command_tree
 from maciota_bot.client.events import on_member_join, on_message
 from maciota_bot.config import settings
-from maciota_bot.db import create_db_engine, init_db
+from maciota_bot.db import create_db_engine, ensure_sqlite_parents, init_db
 from maciota_bot.state import get_state
 
 logger = logging.getLogger('maciota_bot')
@@ -29,6 +29,7 @@ class MaciotaClient(discord.Client):
         self.event(on_member_join)
 
     async def on_ready(self) -> None:
+        ensure_sqlite_parents(settings.database_url, settings.checkpoint_path)
         agent = await build_agent()
         engine = create_db_engine(settings.database_url)
 

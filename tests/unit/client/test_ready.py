@@ -51,7 +51,7 @@ async def test_on_ready_creates_the_welcome_table(
 
     await client.on_ready()
 
-    assert (tmp_path / 'maciota.db').is_file()
+    assert (tmp_path / 'data' / 'maciota.db').is_file()
 
     def table_names(sync_connection: object) -> list[str]:
         return list(inspect(sync_connection).get_table_names())

@@ -16,6 +16,7 @@ discord.log.*
 
 # Database
 *.db
+*.sqlite
 
 # Coverage
 .coverage

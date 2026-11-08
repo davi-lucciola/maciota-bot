@@ -11,6 +11,10 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "discord-py>=2.7.1",
     "greenlet>=3.5.6",
+    "langchain>=1.4.2",
+    "langchain-openai>=1.6.2",
+    "langgraph>=1.2.11",
+    "langgraph-checkpoint-sqlite>=3.1.3",
     "pydantic-settings>=2.16.2",
     "sqlmodel>=0.0.48",
 ]
@@ -54,11 +58,11 @@ markers = [
     "integration: testes de integração (tests/integration)",
     "client: construção do cliente Discord",
     "config: leitura do token",
-    "events: eventos de ready, message e entrada de membro",
-    "services: texto de boas-vindas e canal configurado",
+    "services: boas-vindas e conversa no canal",
     "logs: formatação e configuração de logs",
     "startup: arranque do processo",
-    "state: engine e árvore compartilhados",
+    "state: engine, árvore, cliente e agente compartilhados",
+    "agent: grafo do LangGraph e a resposta no canal",
 ]
 
 [tool.coverage.run]

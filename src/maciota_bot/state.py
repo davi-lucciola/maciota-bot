@@ -1,13 +1,16 @@
 from dataclasses import dataclass
 
-from discord import app_commands
+import discord
 from sqlalchemy.ext.asyncio import AsyncEngine
+
+from maciota_bot.agent import BotAgent
 
 
 @dataclass
 class AppState:
-    engine: AsyncEngine | None = None
-    tree: app_commands.CommandTree | None = None
+    engine: AsyncEngine
+    agent: BotAgent
+    client: discord.Client
 
 
 _state: AppState | None = None
@@ -16,6 +19,7 @@ _state: AppState | None = None
 def get_state() -> AppState:
     if _state is None:
         raise RuntimeError('Application state is not configured')
+
     return _state
 
 

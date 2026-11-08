@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from maciota_bot.config import settings
 from maciota_bot.logs import ColourFormatter, setup_logging
 
 
@@ -28,6 +29,7 @@ def test_setup_logging_splits_console_and_discord_file(
         discord_logger = logging.getLogger('discord')
 
         assert bot_logger.propagate is False
+        assert bot_logger.level == logging.getLevelNamesMapping()[settings.log_level]
         [console] = bot_logger.handlers
         assert type(console) is logging.StreamHandler
         assert isinstance(console.formatter, ColourFormatter)
@@ -36,5 +38,19 @@ def test_setup_logging_splits_console_and_discord_file(
         [file_handler] = discord_logger.handlers
         assert isinstance(file_handler, logging.handlers.RotatingFileHandler)
         assert Path(file_handler.baseFilename) == tmp_path / 'discord.log'
+    finally:
+        _restore('maciota_bot', 'discord', 'discord.http')
+
+
+def test_setup_logging_uses_the_configured_console_level(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(settings, 'log_level', 'DEBUG')
+    setup_logging()
+    try:
+        bot_logger = logging.getLogger('maciota_bot')
+        assert bot_logger.level == logging.DEBUG
     finally:
         _restore('maciota_bot', 'discord', 'discord.http')

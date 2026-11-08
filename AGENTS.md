@@ -2,21 +2,21 @@
 
 ## Architecture
 
-`main` composes the process. It configures logging, opens the async database engine, builds the Discord client and the command tree, stores those shared instances, registers the event handlers, and starts the gateway.
+`main` composes the process. It configures logging, opens the async database engine, builds `MaciotaClient`, stores the client, its command tree, and an empty agent, and starts the gateway. The `BotAgent` is not created here.
 
-`state` holds the shared instances the rest of the process reads: the async SQLAlchemy engine and the command tree. `main` creates that engine once and writes this state before `client.run`. Services and events read it with `get_state()`. A test that needs the engine or the tree publishes an `AppState` and clears it afterwards.
+`client` is the Discord adapter. `MaciotaClient` subclasses `discord.Client` and builds the command tree. `on_ready` builds the agent when it is still empty, creates the tables, syncs the command tree, and logs that the bot connected. `close` closes the agent, then the Discord connection. `client/events` and `client/commands` are the inputs: each handler calls a service and returns.
+
+`state` holds the shared instances the rest of the process reads: the async SQLAlchemy engine, the command tree, the Discord client, and the `BotAgent`. `main` writes this state before `client.run`, with the agent still empty. Services and entrypoints read it with `get_state()`. A test that needs one of them publishes an `AppState` and clears it afterwards.
 
 `db` opens the async engine through aiosqlite. `on_ready` creates the tables on the Discord event loop.
 
 `models` defines the tables.
 
-`commands` registers slash-command entrypoints. A handler calls a service and returns.
+`agent` answers a channel message. `BotAgent.execute` runs the LangGraph for that channel and returns the text to send and, when the bot is answering a person, that message id. The graph is compiled in the constructor with a required checkpointer. On ready that checkpointer is an AsyncSqliteSaver, in its own SQLite file. `get_session()` stays on the SQLModel tables.
 
-`events` owns every Discord event: `on_ready`, `on_message`, and `on_member_join`. `on_ready` creates the tables, logs that the bot connected, and syncs the command tree from state.
+`services/conversation` answers a guild message. It ignores a bot author, a direct message, and a missing agent, then calls `BotAgent.execute`. A reply target becomes a Discord message reference; otherwise the text goes to the channel.
 
-`services/welcome` builds the welcome text, reads and writes a guild's welcome channel, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row.
-
-An event that needs a saved channel asks `welcome` for the id, then uses the Discord guild to resolve and send.
+`services/welcome` builds the welcome text, reads and writes a guild's welcome channel, greets a member who joins, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row. `greet` resolves the saved channel on the guild and falls back to the system channel.
 
 ## Verify
 
@@ -37,6 +37,6 @@ A test under `tests/unit/<domain>/` exercises one module through its public func
 
 A test under `tests/integration/<domain>/` boots real composition: logging handlers, or `main` with the gateway replaced.
 
-`tests/conftest.py` marks each test `unit` or `integration` from its directory, and marks the domain from the next directory (`client`, `config`, `events`, `logs`, `services`, `startup`, `state`). Add the marker in `pyproject.toml` when you add a domain directory.
+`tests/conftest.py` marks each test `unit` or `integration` from its directory, and marks the domain from the next directory (`client`, `config`, `logs`, `services`, `startup`, `state`). Add the marker in `pyproject.toml` when you add a domain directory.
 
 `tests/conftest.py` sets `DISCORD_TOKEN` before the suite imports `maciota_bot.config`. A test that needs another token sets the environment and constructs `Settings()` itself.

@@ -1,10 +1,13 @@
+import logging
 import random
 
 import discord
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from maciota_bot.db import get_session
 from maciota_bot.models import GuildWelcomeChannel
-from maciota_bot.state import get_state
+
+logger = logging.getLogger(__name__)
 
 WELCOME_TEMPLATES: tuple[str, ...] = (
     '{user_name} entrou. Esconde o controle antes que peça.',
@@ -24,36 +27,39 @@ def build_welcome_message(user_name: str) -> str:
 
 
 async def _find_welcome_row(
-    session: AsyncSession,
-    guild_id: int,
+    session: AsyncSession, guild_id: int
 ) -> GuildWelcomeChannel | None:
     return await session.get(GuildWelcomeChannel, guild_id)
 
 
+async def _save_welcome_channel(
+    session: AsyncSession, guild_channel: GuildWelcomeChannel
+) -> None:
+    session.add(guild_channel)
+    await session.commit()
+
+
 async def get_welcome_channel_id(guild_id: int) -> int | None:
-    engine = get_state().engine
-    if engine is None:
-        return None
-    async with AsyncSession(engine) as session:
+    async with get_session() as session:
         row = await _find_welcome_row(session, guild_id)
+
         if row is None:
             return None
+
         return row.channel_id
 
 
 async def set_welcome_channel(guild_id: int, channel_id: int) -> None:
-    engine = get_state().engine
-    if engine is None:
-        raise RuntimeError('Database engine is not configured')
-    async with AsyncSession(engine) as session:
+    async with get_session() as session:
         row = await _find_welcome_row(session, guild_id)
-        if row is None:
-            session.add(
-                GuildWelcomeChannel(guild_id=guild_id, channel_id=channel_id),
-            )
-        else:
+
+        if row is not None:
             row.channel_id = channel_id
-        await session.commit()
+            await session.commit()
+            return
+
+        guild_channel = GuildWelcomeChannel(guild_id=guild_id, channel_id=channel_id)
+        await _save_welcome_channel(session, guild_channel)
 
 
 async def define_welcome_channel(
@@ -79,6 +85,35 @@ async def define_welcome_channel(
         interaction,
         f'Canal de boas-vindas definido para {canal.mention}.',
     )
+
+
+async def greet(member: discord.Member) -> None:
+    if member.bot:
+        return
+
+    channel = await _configured_channel(member)
+    if channel is None:
+        channel = member.guild.system_channel
+    if channel is None:
+        logger.warning('Canal de sistema ausente')
+        return
+
+    message = build_welcome_message(member.mention)
+    await channel.send(message)
+
+
+async def _configured_channel(
+    member: discord.Member,
+) -> discord.abc.Messageable | None:
+    channel_id = await get_welcome_channel_id(member.guild.id)
+    if channel_id is None:
+        return None
+
+    channel = member.guild.get_channel(channel_id)
+    if channel is None:
+        logger.warning('Canal de boas-vindas ausente')
+        return None
+    return channel
 
 
 async def _reply(interaction: discord.Interaction, content: str) -> None:

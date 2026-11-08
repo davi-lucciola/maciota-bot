@@ -5,7 +5,9 @@ from pathlib import Path
 import discord
 import pytest
 
-from maciota_bot.events import on_member_join, on_message, on_ready
+from maciota_bot.agent import BotAgent
+from maciota_bot.client import MaciotaClient
+from maciota_bot.client.events import on_member_join, on_message
 from maciota_bot.main import main
 from maciota_bot.services.welcome import WELCOME_TEMPLATES
 from maciota_bot.state import get_state
@@ -23,13 +25,6 @@ class _Channel:
 
     async def send(self, content: str) -> None:
         self.sent.append(content)
-
-
-class _Message:
-    def __init__(self, content: str, *, bot: bool = False) -> None:
-        self.content = content
-        self.author = _Author(bot=bot)
-        self.channel = _Channel()
 
 
 class _Guild:
@@ -62,7 +57,7 @@ def _restore(*names: str) -> None:
         logger.setLevel(logging.NOTSET)
 
 
-async def test_main_logs_in_with_the_token_and_answers_ping(
+async def test_main_logs_in_with_the_token_and_publishes_the_agent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -86,15 +81,9 @@ async def test_main_logs_in_with_the_token_and_answers_ping(
         assert captured['token'] == 'test-token'
         assert captured['log_handler'] is None
         client = captured['client']
-        assert isinstance(client, discord.Client)
-        assert get_state().engine is not None
-        assert get_state().tree is client.tree
-        assert client.on_ready is on_ready
+        assert isinstance(client, MaciotaClient)
         assert client.on_message is on_message
         assert client.on_member_join is on_member_join
-        message = _Message('!ping')
-        await client.on_message(message)
-        assert message.channel.sent == ['pong']
     finally:
         await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')
@@ -128,9 +117,10 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         main()
 
         client = captured['client']
-        assert isinstance(client, discord.Client)
+        assert isinstance(client, MaciotaClient)
         await client.on_ready()
-        assert (tmp_path / 'maciota.db').is_file()
+        assert isinstance(get_state().agent, BotAgent)
+        assert (tmp_path / 'data' / 'maciota.db').is_file()
         channel = _Channel()
         member = _Member('<@42>', channel=channel)
         await client.on_member_join(member)
@@ -173,15 +163,16 @@ async def test_main_syncs_the_welcome_command_when_ready(
     monkeypatch.setattr(discord.Client, 'run', run)
     monkeypatch.setattr(discord.app_commands.CommandTree, 'sync', sync)
     handler = record_bot_connected(order)
-    events_logger = logging.getLogger('maciota_bot.events')
+    client_logger = logging.getLogger('maciota_bot')
     try:
         main()
 
         client = captured['client']
-        assert isinstance(client, discord.Client)
-        events_logger.addHandler(handler)
+        assert isinstance(client, MaciotaClient)
+        client_logger.addHandler(handler)
         await client.on_ready()
-        assert order == ['log', 'sync']
+        assert isinstance(get_state().agent, BotAgent)
+        assert order == ['sync', 'log']
         command = client.tree.get_command('boas-vindas')
         assert command is not None
         assert command.name == 'boas-vindas'
@@ -190,6 +181,6 @@ async def test_main_syncs_the_welcome_command_when_ready(
         assert command.default_permissions.administrator is True
         assert command.get_parameter('canal') is not None
     finally:
-        events_logger.removeHandler(handler)
+        client_logger.removeHandler(handler)
         await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')

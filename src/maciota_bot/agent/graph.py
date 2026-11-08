@@ -1,0 +1,37 @@
+from langchain.chat_models import BaseChatModel
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
+
+from maciota_bot.agent.nodes import make_nodes
+from maciota_bot.agent.schema import BotInput
+from maciota_bot.agent.state import BotState
+
+type BotGraph = CompiledStateGraph[BotState, None, BotInput, BotState]
+
+
+def route_after_trigger(state: BotState) -> str:
+    if state['approved']:
+        return 'persona_router'
+    return END
+
+
+def build_graph(
+    checkpointer: BaseCheckpointSaver,
+    light_model: BaseChatModel,
+    reply_model: BaseChatModel,
+) -> BotGraph:
+    evaluate_trigger, persona_router, generate_response = make_nodes(
+        light_model,
+        reply_model,
+    )
+
+    graph = StateGraph(BotState, input_schema=BotInput)
+    graph.add_node('evaluate_trigger', evaluate_trigger)
+    graph.add_node('persona_router', persona_router)
+    graph.add_node('generate_response', generate_response)
+    graph.add_edge(START, 'evaluate_trigger')
+    graph.add_conditional_edges('evaluate_trigger', route_after_trigger)
+    graph.add_edge('persona_router', 'generate_response')
+    graph.add_edge('generate_response', END)
+    return graph.compile(checkpointer=checkpointer)

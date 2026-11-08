@@ -14,16 +14,10 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.13-slim AS runtime
 
-RUN groupadd --system --gid 999 maciota \
-    && useradd --system --gid 999 --uid 999 --create-home --home-dir /home/maciota maciota
-
 WORKDIR /app
 
-COPY --from=builder --chown=maciota:maciota /app/.venv /app/.venv
-
-RUN chown maciota:maciota /app
+COPY --from=builder /app/.venv /app/.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-ENTRYPOINT ["/app/.venv/bin/python", "-m", "maciota_bot.entrypoint"]
 CMD ["maciota-bot"]

@@ -27,6 +27,7 @@ async def test_on_ready_syncs_then_logs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
     order: list[str] = []
     client = MaciotaClient()
     client.tree = _Tree(order)
@@ -48,6 +49,7 @@ async def test_on_ready_creates_the_welcome_table(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
     client = MaciotaClient()
     client.tree = _Tree([])
 

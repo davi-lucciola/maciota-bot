@@ -94,6 +94,7 @@ async def test_main_sends_a_welcome_when_a_member_joins(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
     captured: dict[str, object] = {}
 
     def run(
@@ -141,6 +142,7 @@ async def test_main_syncs_the_welcome_command_when_ready(
     record_bot_connected: Callable[[list[str]], logging.Handler],
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
     captured: dict[str, object] = {}
     order: list[str] = []
 

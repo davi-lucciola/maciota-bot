@@ -23,7 +23,7 @@ def _record_bot_connected(order: list[str]) -> logging.Handler:
             self.order = order
 
         def emit(self, record: logging.LogRecord) -> None:
-            if record.getMessage() == 'Bot conectado':
+            if record.getMessage() == 'Maciota está na atividade, conectado.':
                 self.order.append('log')
 
     return _ConnectedHandler()

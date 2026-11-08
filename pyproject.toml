@@ -1,7 +1,7 @@
 [project]
 name = "maciota-bot"
 version = "0.1.0"
-description = "Add your description here"
+description = "Discord bot that joins a guild channel in Brazilian Portuguese and welcomes new members."
 readme = "README.md"
 authors = [
     { name = "Davi Lucciola", email = "davilucciola14@gmail.com" }

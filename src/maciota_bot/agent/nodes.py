@@ -6,13 +6,17 @@ from pydantic import Field
 
 from maciota_bot.agent.prompt import (
     PERSONA_PROMPT,
-    STYLES,
     recent_messages,
     reply_prompt,
     server_context,
     trigger_instruction,
 )
-from maciota_bot.agent.schema import BotInput, TriggerAction, TriggerDecision
+from maciota_bot.agent.schema import (
+    BotInput,
+    StyleDecision,
+    TriggerAction,
+    TriggerDecision,
+)
 from maciota_bot.agent.state import BotState
 
 logger = logging.getLogger(__name__)
@@ -21,14 +25,6 @@ logger = logging.getLogger(__name__)
 def model_input(state: BotState, instruction: str) -> list:
     system = f'{server_context(state)}\n\n{instruction}'
     return [SystemMessage(content=system), *recent_messages(state)]
-
-
-def select_style(text: str) -> str:
-    cleaned = text.strip().casefold()
-    for style in STYLES:
-        if style.casefold() in cleaned:
-            return style
-    return STYLES[0]
 
 
 def message_id_at(state: BotState, index: int | None) -> int | None:
@@ -62,6 +58,7 @@ def turn_state(turn: _TriggerInput) -> BotState:
         'guild_description': turn.guild_description,
         'channel_name': turn.channel_name,
         'channel_topic': turn.channel_topic,
+        'acidity': turn.acidity,
         'context_hook': '',
         'persona_style': '',
         'final_response': '',
@@ -120,10 +117,16 @@ def make_nodes(
         return state
 
     async def persona_router(state: BotState) -> dict[str, str]:
-        reply = await light_model.ainvoke(model_input(state, PERSONA_PROMPT))
-        style = select_style(_text(reply))
-        logger.debug('Estilo escolhido: %s', style)
-        return {'persona_style': style}
+        structured = light_model.with_structured_output(StyleDecision)
+        decision = await structured.ainvoke(model_input(state, PERSONA_PROMPT))
+
+        if not isinstance(decision, StyleDecision):
+            raise TypeError(
+                f'Esperado StyleDecision da LLM, recebido {type(decision).__name__}'
+            )
+
+        logger.debug('Estilo escolhido: %s', decision.style)
+        return {'persona_style': decision.style}
 
     async def generate_response(state: BotState) -> dict[str, object]:
         reply = await reply_model.ainvoke(model_input(state, reply_prompt(state)))

@@ -16,6 +16,7 @@ class BotState(TypedDict):
     guild_description: str | None
     channel_name: str | None
     channel_topic: str | None
+    acidity: str
     context_hook: str
     persona_style: str
     final_response: str

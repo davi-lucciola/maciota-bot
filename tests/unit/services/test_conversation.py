@@ -3,6 +3,8 @@ import logging
 import pytest
 
 from maciota_bot.agent.schema import AgentOutput, BotInput
+from maciota_bot.db import init_db
+from maciota_bot.services.acidity import set_acidity
 from maciota_bot.services.conversation import respond
 from maciota_bot.state import configure, get_state
 from tests.support import make_state
@@ -70,8 +72,9 @@ class _Agent:
         return self.output
 
 
-def _publish(agent: _Agent) -> None:
+async def _publish(agent: _Agent) -> None:
     current = get_state()
+    await init_db(current.engine)
     configure(make_state(current.engine, agent=agent))
 
 
@@ -91,7 +94,7 @@ def _turn(*, trigger_type: str, content: str) -> BotInput:
 
 async def test_bot_author_receives_no_reply() -> None:
     agent = _Agent('oi')
-    _publish(agent)
+    await _publish(agent)
     message = _Message('!ping', bot=True)
 
     await respond(message)
@@ -102,7 +105,7 @@ async def test_bot_author_receives_no_reply() -> None:
 
 async def test_direct_message_receives_no_reply() -> None:
     agent = _Agent('oi')
-    _publish(agent)
+    await _publish(agent)
     message = _Message('oi', direct=True)
 
     await respond(message)
@@ -116,7 +119,7 @@ async def test_mention_replies_to_the_message(
 ) -> None:
     caplog.set_level(logging.DEBUG, logger='maciota_bot.services.conversation')
     agent = _Agent('cheguei', reply_to=99)
-    _publish(agent)
+    await _publish(agent)
     message = _Message('e ai', mentioned=True)
 
     await respond(message)
@@ -124,6 +127,7 @@ async def test_mention_replies_to_the_message(
     assert message.channel.sent == ['cheguei']
     assert message.channel.references[0].message_id == 99
     assert agent.calls == [_turn(trigger_type='mention', content='e ai')]
+    assert agent.calls[0].acidity == 'medium'
     assert 'Mensagem recebida no servidor Servidor de Ada: e ai' in caplog.text
     assert 'Decisão: enviar resposta à mensagem 99' in caplog.text
 
@@ -133,7 +137,7 @@ async def test_ordinary_text_is_a_channel_message(
 ) -> None:
     caplog.set_level(logging.DEBUG, logger='maciota_bot.services.conversation')
     agent = _Agent('kkk')
-    _publish(agent)
+    await _publish(agent)
     message = _Message('!ping')
 
     await respond(message)
@@ -149,7 +153,7 @@ async def test_empty_response_sends_nothing(
 ) -> None:
     caplog.set_level(logging.DEBUG, logger='maciota_bot.services.conversation')
     agent = _Agent('   ')
-    _publish(agent)
+    await _publish(agent)
     message = _Message('hello')
 
     await respond(message)
@@ -160,9 +164,20 @@ async def test_empty_response_sends_nothing(
 
 async def test_agent_failure_sends_nothing() -> None:
     agent = _Agent(fail=True)
-    _publish(agent)
+    await _publish(agent)
     message = _Message('hello')
 
     await respond(message)
 
     assert message.channel.sent == []
+
+
+async def test_saved_acidity_reaches_the_turn() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    await set_acidity(3, 'sharp')
+    message = _Message('e ai', mentioned=True)
+
+    await respond(message)
+
+    assert agent.calls[0].acidity == 'sharp'

@@ -72,18 +72,18 @@ async def define_welcome_channel(
     if not interaction.user.guild_permissions.administrator:
         await _reply(
             interaction,
-            'Só administradores podem definir o canal de boas-vindas.',
+            'Only administrators can set the welcome channel.',
         )
         return
 
     if not _channel_in_guild(canal, guild):
-        await _reply(interaction, 'Esse canal não existe neste servidor.')
+        await _reply(interaction, 'That channel is not in this server.')
         return
 
     await set_welcome_channel(guild.id, canal.id)
     await _reply(
         interaction,
-        f'Canal de boas-vindas definido para {canal.mention}.',
+        f'Welcome channel set to {canal.mention}.',
     )
 
 

@@ -3,7 +3,8 @@ from typing import Literal
 
 import discord
 
-from maciota_bot.agent.schema import AgentOutput, BotInput
+from maciota_bot.agent.schema import Acidity, AgentOutput, BotInput
+from maciota_bot.services.acidity import get_acidity
 from maciota_bot.state import get_state
 
 logger = logging.getLogger(__name__)
@@ -31,8 +32,9 @@ async def respond(message: discord.Message) -> None:
     trigger_type: Literal['mention', 'proactive'] = (
         'mention' if user is not None and user.mentioned_in(message) else 'proactive'
     )
+    acidity = await get_acidity(guild.id)
     try:
-        output = await agent.execute(_turn(message, trigger_type))
+        output = await agent.execute(_turn(message, trigger_type, acidity))
         await _send_output(message, output)
     except Exception:
         logger.exception('Falha ao responder no canal')
@@ -41,6 +43,7 @@ async def respond(message: discord.Message) -> None:
 def _turn(
     message: discord.Message,
     trigger_type: Literal['mention', 'proactive'],
+    acidity: Acidity,
 ) -> BotInput:
     channel = message.channel
     guild = message.guild
@@ -55,6 +58,7 @@ def _turn(
         guild_description=guild.description,
         channel_name=getattr(channel, 'name', None),
         channel_topic=getattr(channel, 'topic', None),
+        acidity=acidity,
     )
 
 

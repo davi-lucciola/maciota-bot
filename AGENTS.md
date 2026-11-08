@@ -16,7 +16,9 @@
 
 `services/conversation` answers a guild message. It ignores a bot author, a direct message, and a missing agent, then calls `BotAgent.execute`. A reply target becomes a Discord message reference; otherwise the text goes to the channel.
 
-`services/welcome` builds the welcome text, reads and writes a guild's welcome channel, greets a member who joins, and performs the `/boas-vindas` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row. `greet` resolves the saved channel on the guild and falls back to the system channel.
+`services/welcome` builds the welcome text, reads and writes a guild's welcome channel, greets a member who joins, and performs the `/welcome` use case: the user is an administrator, the channel belongs to the guild, the reply, and the saved row. `greet` resolves the saved channel on the guild and falls back to the system channel.
+
+`services/acidity` reads and writes a guild's acidity (`mild`, `medium`, or `sharp`) and performs the `/acidity` use case. A guild with no row uses `medium`. `services/conversation` puts that level on the turn, and the reply prompt's acidity section and few-shot examples follow it.
 
 ## Verify
 

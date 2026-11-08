@@ -3,11 +3,20 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+type Acidity = Literal['mild', 'medium', 'sharp']
+
 
 class TriggerAction(StrEnum):
     SILENCE = 'silence'
     CHANNEL = 'channel'
     REPLY = 'reply'
+
+
+class PersonaStyle(StrEnum):
+    IRONIA_CURTA = 'ironia curta'
+    ZOEIRA_DIRETA = 'zoeira direta'
+    EXPLICATIVA = 'explicativa'
+    BORDAO = 'bordão'
 
 
 class TriggerDecision(BaseModel):
@@ -47,6 +56,24 @@ class TriggerDecision(BaseModel):
     )
 
 
+class StyleDecision(BaseModel):
+    """Escolhe o tom desta resposta.
+
+    Os campos seguem a ordem em que o modelo preenche: primeiro o
+    raciocínio, depois o estilo.
+    """
+
+    reasoning: str = Field(
+        description='Primeiro campo. Uma frase sobre o tom que cabe nesta fala.'
+    )
+    style: PersonaStyle = Field(
+        description=(
+            'Depois do raciocínio. ironia curta, zoeira direta, '
+            'explicativa ou bordão. Muda o tom, não o trabalho.'
+        )
+    )
+
+
 class BotInput(BaseModel):
     channel_id: int
     message_id: int
@@ -57,6 +84,7 @@ class BotInput(BaseModel):
     guild_description: str | None = None
     channel_name: str | None = None
     channel_topic: str | None = None
+    acidity: Acidity = 'medium'
 
 
 class AgentOutput(BaseModel):

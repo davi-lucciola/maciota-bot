@@ -33,17 +33,53 @@ async def respond(message: discord.Message) -> None:
         'mention' if user is not None and user.mentioned_in(message) else 'proactive'
     )
     acidity = await get_acidity(guild.id)
+    referenced_author, referenced_excerpt = await _referenced(message)
     try:
-        output = await agent.execute(_turn(message, trigger_type, acidity))
+        output = await agent.execute(
+            _turn(
+                message,
+                trigger_type,
+                acidity,
+                referenced_author,
+                referenced_excerpt,
+            )
+        )
         await _send_output(message, output)
     except Exception:
         logger.exception('Falha ao responder no canal')
+
+
+async def _referenced(message: discord.Message) -> tuple[str | None, str | None]:
+    reference = message.reference
+    if reference is None or reference.message_id is None:
+        return None, None
+    quote = _quote(reference.resolved)
+    if quote != (None, None):
+        return quote
+    try:
+        resolved = await message.channel.fetch_message(reference.message_id)
+    except discord.HTTPException:
+        return None, None
+    return _quote(resolved)
+
+
+def _quote(resolved: object) -> tuple[str | None, str | None]:
+    author = getattr(getattr(resolved, 'author', None), 'display_name', None)
+    content = getattr(resolved, 'content', None)
+    if not isinstance(author, str) and not isinstance(content, str):
+        return None, None
+    return (
+        author if isinstance(author, str) else None,
+        content if isinstance(content, str) else None,
+    )
 
 
 def _turn(
     message: discord.Message,
     trigger_type: Literal['mention', 'proactive'],
     acidity: Acidity,
+    referenced_author: str | None,
+    referenced_excerpt: str | None,
 ) -> BotInput:
     channel = message.channel
     guild = message.guild
@@ -60,6 +96,8 @@ def _turn(
         channel_name=getattr(channel, 'name', None),
         channel_topic=getattr(channel, 'topic', None),
         acidity=acidity,
+        referenced_author=referenced_author,
+        referenced_excerpt=referenced_excerpt,
     )
 
 

@@ -97,18 +97,23 @@ async def _say(
     guild_name: str | None = None,
     channel_name: str | None = None,
     acidity: Acidity = 'medium',
+    author_name: str = 'Ada',
+    referenced_author: str | None = None,
+    referenced_excerpt: str | None = None,
 ) -> AgentOutput:
     return await agent.execute(
         BotInput(
             channel_id=channel_id,
             message_id=message_id,
-            author_name='Ada',
+            author_name=author_name,
             content=content,
             created_at=_SENT_AT,
             trigger_type=trigger_type,
             guild_name=guild_name,
             channel_name=channel_name,
             acidity=acidity,
+            referenced_author=referenced_author,
+            referenced_excerpt=referenced_excerpt,
         )
     )
 
@@ -143,7 +148,8 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
     assert 'Resposta gerada: kkkkk intankavel' in caplog.text
     assert text.reply_to_message_id == 1
     assert len(light.seen) == 1
-    assert _conversation(reply.seen[0]) == ['Ada (12:23): e ai']
+    assert _conversation(reply.seen[0]) == ['[0] (12:23) e ai']
+    assert reply.seen[0][1].name == 'Ada'
     assert 'Decida se o Maciota entra' not in _system(light.seen[0])
     assert 'Estilo desta resposta: ironia curta.' in system
     assert 'rir' in system
@@ -217,7 +223,10 @@ async def test_proactive_channel_message_reaches_the_reply(
     text = await _say(agent, 'cadê o controle', trigger_type='proactive')
 
     assert text.text == 'sumiu mesmo'
+    assert 'respondendo a' not in text.text
     assert text.reply_to_message_id is None
+    assert _conversation(reply.seen[0]) == ['[0] (12:23) cadê o controle']
+    assert reply.seen[0][1].name == 'Ada'
     assert 'o controle sumiu' in _system(reply.seen[0])
     assert 'Estilo desta resposta: zoeira direta.' in _system(reply.seen[0])
     assert 'Mensagem geral no canal' in _system(reply.seen[0])
@@ -241,7 +250,7 @@ async def test_proactive_reply_uses_the_message_id(
     reply = ScriptedModel(['sumiu mesmo', 'de novo'])
     agent = _agent(light, reply)
 
-    await _say(agent, 'cadê o controle', message_id=10)
+    first = await _say(agent, 'cadê o controle', message_id=10)
     text = await _say(
         agent,
         'alguém viu?',
@@ -249,7 +258,10 @@ async def test_proactive_reply_uses_the_message_id(
         trigger_type='proactive',
     )
 
+    assert first.text == 'sumiu mesmo'
+    assert 'respondendo a' not in first.text
     assert text.text == 'de novo'
+    assert 'respondendo a' not in text.text
     assert text.reply_to_message_id == 10
     trigger = light.seen[1]
     system = _system(trigger)
@@ -259,10 +271,16 @@ async def test_proactive_reply_uses_the_message_id(
     assert 'sumiu mesmo' not in system
     assert 'Maciota (você)' not in system
     assert _conversation(trigger) == [
-        'Ada (12:23): cadê o controle',
-        'sumiu mesmo',
-        'Ada (12:23): alguém viu?',
+        '[0] (12:23) cadê o controle',
+        '[1] respondendo a Ada ("(12:23) cadê o controle"): sumiu mesmo',
+        '[2] (12:23) alguém viu?',
     ]
+    assert '[0] [0]' not in '\n'.join(_conversation(trigger))
+    assert [message.name for message in trigger if message.type == 'human'] == [
+        'Ada',
+        'Ada',
+    ]
+    assert [message.name for message in trigger if message.type == 'ai'] == ['Maciota']
     assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[-1])
     assert (
         'Decisão: reply, enviar. gancho=o controle sumiu reply_to=10. '
@@ -290,6 +308,106 @@ async def test_invalid_reply_index_falls_back_to_the_channel() -> None:
     assert 'Mensagem geral no canal' in _system(reply.seen[0])
 
 
+async def test_reply_index_two_is_the_third_message() -> None:
+    light = ScriptedModel([
+        _style('ironia curta'),
+        TriggerDecision(
+            reasoning='a terceira',
+            action=TriggerAction.REPLY,
+            message_index=2,
+            hook='a terceira',
+        ),
+        _style('zoeira direta'),
+    ])
+    reply = ScriptedModel(['ok', 'na terceira'])
+    agent = _agent(light, reply)
+
+    await _say(agent, 'primeira', message_id=10)
+    text = await _say(
+        agent,
+        'terceira',
+        message_id=12,
+        trigger_type='proactive',
+    )
+
+    assert text.reply_to_message_id == 12
+    assert _conversation(light.seen[1]) == [
+        '[0] (12:23) primeira',
+        '[1] respondendo a Ada ("(12:23) primeira"): ok',
+        '[2] (12:23) terceira',
+    ]
+
+
+async def test_maciota_index_falls_back_to_the_channel() -> None:
+    light = ScriptedModel([
+        _style('ironia curta'),
+        TriggerDecision(
+            reasoning='índice do Maciota',
+            action=TriggerAction.REPLY,
+            message_index=1,
+            hook='a linha do bot',
+        ),
+        _style('zoeira direta'),
+    ])
+    reply = ScriptedModel(['ok', 'no canal'])
+    agent = _agent(light, reply)
+
+    await _say(agent, 'primeira', message_id=10)
+    text = await _say(
+        agent,
+        'terceira',
+        message_id=12,
+        trigger_type='proactive',
+    )
+
+    assert text.text == 'no canal'
+    assert text.reply_to_message_id is None
+    assert 'Mensagem geral no canal' in _system(reply.seen[-1])
+
+
+async def test_display_name_becomes_the_message_name() -> None:
+    light = ScriptedModel([_style('ironia curta')])
+    reply = ScriptedModel(['ok'])
+    agent = _agent(light, reply)
+
+    await _say(agent, 'oi', author_name='Davi Lucciola', message_id=1)
+    named = reply.seen[-1][1]
+    assert named.name == 'Davi_Lucciola'
+    assert 'Davi Lucciola' not in str(named.content)
+
+    await _say(
+        agent,
+        'oi',
+        author_name='!!!',
+        message_id=2,
+        channel_id=2,
+    )
+    assert reply.seen[-1][1].name == 'usuario'
+
+
+async def test_discord_reply_is_marked_on_the_user_line() -> None:
+    light = ScriptedModel([_style('ironia curta')])
+    reply = ScriptedModel(['ok'])
+    agent = _agent(light, reply)
+
+    text = await _say(
+        agent,
+        'responde ele',
+        author_name='Jet',
+        referenced_author='Davi Lucciola',
+        referenced_excerpt='Eu posso te desligar ein',
+    )
+
+    assert text.text == 'ok'
+    assert 'respondendo a' not in text.text
+    human = reply.seen[0][1]
+    assert human.name == 'Jet'
+    assert _conversation(reply.seen[0]) == [
+        '[0] (12:23) respondendo a Davi_Lucciola '
+        '("Eu posso te desligar ein"): responde ele'
+    ]
+
+
 async def test_model_sees_only_the_last_thirty_messages() -> None:
     light = ScriptedModel([_style('ironia curta')])
     reply = ScriptedModel(['ok'])
@@ -300,8 +418,9 @@ async def test_model_sees_only_the_last_thirty_messages() -> None:
 
     conversation = _conversation(reply.seen[-1])
     assert len(conversation) == 30
-    assert 'Ada (12:23): msg-0' not in conversation
-    assert 'Ada (12:23): msg-15' in conversation
+    assert any(line.endswith('msg-15') for line in conversation)
+    assert not any(line.endswith('msg-0') for line in conversation)
+    assert '[0] [0]' not in '\n'.join(conversation)
     assert len(_conversation(light.seen[-1])) == 30
 
 
@@ -322,12 +441,18 @@ async def test_sqlite_thread_is_per_channel(
         checkpoint_serde._warned_unregistered_types.clear()
         await _say(agent, 'de novo', channel_id=1, message_id=2)
         assert 'PersonaStyle' not in caplog.text
-        assert 'Ada (12:23): segredo' in _conversation(reply.seen[-1])
+        seen = reply.seen[-1]
+        conversation = _conversation(seen)
+        assert any(line.endswith('segredo') for line in conversation)
+        assert [message.name for message in seen if message.type == 'human'] == [
+            'Ada',
+            'Ada',
+        ]
 
         await _say(agent, 'outro', channel_id=2, message_id=3)
         conversation = _conversation(reply.seen[-1])
-        assert 'Ada (12:23): segredo' not in conversation
-        assert 'Ada (12:23): outro' in conversation
+        assert not any('segredo' in line for line in conversation)
+        assert any(line.endswith('outro') for line in conversation)
     finally:
         await agent.aclose()
 
@@ -382,9 +507,9 @@ async def test_same_channel_turns_do_not_overlap() -> None:
     assert (await second).text == 'segundo'
     assert second_entered.is_set()
     assert _conversation(reply.seen[-1]) == [
-        'Ada (12:23): um',
-        'primeiro',
-        'Ada (12:23): dois',
+        '[0] (12:23) um',
+        '[1] respondendo a Ada ("(12:23) um"): primeiro',
+        '[2] (12:23) dois',
     ]
 
 

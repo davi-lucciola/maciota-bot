@@ -44,9 +44,10 @@ class TriggerDecision(BaseModel):
     )
     message_index: int | None = Field(
         description=(
-            'Se action for reply, o índice de uma mensagem de pessoa na '
-            'janela numerada, começando em 0 na mais antiga. Nunca o '
-            'índice de uma linha Maciota (você). Nos outros casos, null.'
+            'Se action for reply, copie o número entre colchetes no começo '
+            'da linha de uma pessoa. 0 é a mais antiga desta janela. Nunca o '
+            'número de uma linha Maciota. Nos outros casos, null. Não use 0 '
+            'como padrão.'
         )
     )
     hook: str = Field(
@@ -90,6 +91,8 @@ class BotInput(BaseModel):
     channel_name: str | None = None
     channel_topic: str | None = None
     acidity: Acidity = 'medium'
+    referenced_author: str | None = None
+    referenced_excerpt: str | None = None
 
 
 class AgentOutput(BaseModel):

@@ -2,6 +2,8 @@ import logging
 import logging.config
 from typing import Any
 
+from maciota_bot.config import settings
+
 _RESET = '\x1b[0m'
 _TRACEBACK_COLOUR = '\x1b[31m'
 _LEVEL_COLOURS = {
@@ -84,7 +86,7 @@ def _config() -> dict[str, Any]:
             },
             'maciota_bot': {
                 'handlers': ['console'],
-                'level': 'INFO',
+                'level': settings.log_level,
                 'propagate': False,
             },
         },

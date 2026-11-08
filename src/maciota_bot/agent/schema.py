@@ -28,9 +28,9 @@ class TriggerDecision(BaseModel):
 
     reasoning: str = Field(
         description=(
-            'Primeiro campo. Uma ou duas frases sobre o que está '
-            'acontecendo e por que entrar ou ficar quieto. O padrão é '
-            'silence.'
+            'Discorra em um breve parágrafo sobre o que está '
+            'acontecendo na conversa e por que entrar ou ficar quieto. '
+            'O padrão é silence.'
         )
     )
     action: TriggerAction = Field(
@@ -64,12 +64,15 @@ class StyleDecision(BaseModel):
     """
 
     reasoning: str = Field(
-        description='Primeiro campo. Uma frase sobre o tom que cabe nesta fala.'
+        description=(
+            'Discorra em um breve parágrafo sobre a conversa que está '
+            'acontecendo e avalie os sentimentos e o tom dos usuários.'
+        )
     )
     style: PersonaStyle = Field(
         description=(
-            'Depois do raciocínio. ironia curta, zoeira direta, '
-            'explicativa ou bordão. Muda o tom, não o trabalho.'
+            'Dado os sentimentos e o tom dos usuários escolha o estilo adequado '
+            'para a resposta ironia curta, zoeira direta, explicativa ou bordão.'
         )
     )
 

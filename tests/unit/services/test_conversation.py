@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 
 import pytest
 
@@ -8,6 +9,8 @@ from maciota_bot.services.acidity import set_acidity
 from maciota_bot.services.conversation import respond
 from maciota_bot.state import configure, get_state
 from tests.support import make_state
+
+_SENT_AT = datetime(2026, 11, 8, 15, 23, tzinfo=UTC)
 
 
 class _Author:
@@ -49,6 +52,7 @@ class _Message:
         self.id = 99
         self.mentioned = mentioned
         self.author = _Author(bot=bot)
+        self.created_at = _SENT_AT
         self.channel = _Channel()
         self.guild = None if direct else _Guild()
 
@@ -84,6 +88,7 @@ def _turn(*, trigger_type: str, content: str) -> BotInput:
         message_id=99,
         author_name='Ada',
         content=content,
+        created_at=_SENT_AT,
         trigger_type=trigger_type,
         guild_name='Servidor',
         guild_description='um lugar',

@@ -1,4 +1,6 @@
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from langchain.chat_models import BaseChatModel
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
@@ -20,6 +22,12 @@ from maciota_bot.agent.schema import (
 from maciota_bot.agent.state import BotState
 
 logger = logging.getLogger(__name__)
+_SAO_PAULO = ZoneInfo('America/Sao_Paulo')
+
+
+def _user_line(author_name: str, created_at: datetime, content: str) -> str:
+    clock = created_at.astimezone(_SAO_PAULO).strftime('%H:%M')
+    return f'{author_name} ({clock}): {content}'
 
 
 def model_input(state: BotState, instruction: str) -> list:
@@ -45,7 +53,7 @@ class _TriggerInput(BotInput):
 
 def turn_state(turn: _TriggerInput) -> BotState:
     incoming = HumanMessage(
-        content=f'{turn.author_name}: {turn.content}',
+        content=_user_line(turn.author_name, turn.created_at, turn.content),
         id=str(turn.message_id),
     )
     return {

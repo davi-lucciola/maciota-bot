@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 
@@ -7,10 +8,10 @@ from langchain.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from maciota_bot.agent import Agent
+from maciota_bot.agent import BotAgent
 from maciota_bot.agent.schema import (
-    AgentInput,
     AgentOutput,
+    BotInput,
     TriggerAction,
     TriggerDecision,
 )
@@ -52,8 +53,8 @@ class _Structured:
         return item
 
 
-def _agent(light: ScriptedModel, reply: ScriptedModel) -> Agent:
-    return Agent(
+def _agent(light: ScriptedModel, reply: ScriptedModel) -> BotAgent:
+    return BotAgent(
         checkpointer=MemorySaver(),
         light_model=light,
         reply_model=reply,
@@ -61,7 +62,7 @@ def _agent(light: ScriptedModel, reply: ScriptedModel) -> Agent:
 
 
 async def _say(
-    agent: Agent,
+    agent: BotAgent,
     content: str,
     *,
     channel_id: int = 1,
@@ -71,7 +72,7 @@ async def _say(
     channel_name: str | None = None,
 ) -> AgentOutput:
     return await agent.execute(
-        AgentInput(
+        BotInput(
             channel_id=channel_id,
             message_id=message_id,
             author_name='Ada',
@@ -114,6 +115,7 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
     assert len(light.seen) == 1
     assert 'Decida se o Maciota entra' not in _system(light.seen[0])
     assert 'ironia curta' in _system(reply.seen[0])
+    assert 'Não narra' in _system(reply.seen[0])
     assert 'dois parágrafos' in _system(reply.seen[0])
     assert 'Servidor: Maciota.' in _system(reply.seen[0])
     assert 'Canal: geral.' in _system(reply.seen[0])
@@ -142,6 +144,7 @@ async def test_proactive_refusal_sends_nothing(
     assert 'Decisão: silence, não enviar. não tem gancho' in caplog.text
     assert len(light.seen) == 1
     assert 'Decida se o Maciota entra' in _system(light.seen[0])
+    assert 'O padrão é ficar quieto' in _system(light.seen[0])
     assert reply.seen == []
 
 
@@ -194,6 +197,7 @@ async def test_proactive_reply_uses_the_message_id(
 
     assert text.text == 'de novo'
     assert text.reply_to_message_id == 10
+    assert 'Maciota (você)' in _system(light.seen[1])
     assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[-1])
     assert (
         'Decisão: reply, enviar. gancho=o controle sumiu reply_to=10. '
@@ -242,7 +246,7 @@ async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
     connection = await aiosqlite.connect(tmp_path / 'checkpoints.db')
     saver = AsyncSqliteSaver(connection)
     await saver.setup()
-    agent = Agent(light_model=light, reply_model=reply, checkpointer=saver)
+    agent = BotAgent(light_model=light, reply_model=reply, checkpointer=saver)
     try:
         await _say(agent, 'segredo', channel_id=1, message_id=1)
         await _say(agent, 'de novo', channel_id=1, message_id=2)
@@ -254,3 +258,59 @@ async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
         assert 'Ada: outro' in conversation
     finally:
         await agent.aclose()
+
+
+class _HoldingModel(ScriptedModel):
+    def __init__(
+        self,
+        replies: list[object],
+        entered: asyncio.Event,
+        release: asyncio.Event,
+        second_entered: asyncio.Event,
+    ) -> None:
+        super().__init__(replies)
+        self._entered = entered
+        self._release = release
+        self._second_entered = second_entered
+
+    async def ainvoke(self, messages: list[object]) -> AIMessage:
+        self.seen.append(list(messages))
+        if len(self.seen) == 1:
+            self._entered.set()
+            await self._release.wait()
+        else:
+            self._second_entered.set()
+        item = self._next()
+        if not isinstance(item, str):
+            raise AssertionError(item)
+        return AIMessage(content=item)
+
+
+async def test_same_channel_turns_do_not_overlap() -> None:
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    second_entered = asyncio.Event()
+    light = _HoldingModel(
+        ['ironia curta', 'ironia curta'],
+        entered,
+        release,
+        second_entered,
+    )
+    reply = ScriptedModel(['primeiro', 'segundo'])
+    agent = _agent(light, reply)
+
+    first = asyncio.create_task(_say(agent, 'um', message_id=1))
+    await entered.wait()
+    second = asyncio.create_task(_say(agent, 'dois', message_id=2))
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(second_entered.wait(), timeout=0.05)
+
+    release.set()
+    assert (await first).text == 'primeiro'
+    assert (await second).text == 'segundo'
+    assert second_entered.is_set()
+    assert _conversation(reply.seen[-1]) == [
+        'Ada: um',
+        'primeiro',
+        'Ada: dois',
+    ]

@@ -3,7 +3,7 @@ from typing import Literal
 
 import discord
 
-from maciota_bot.agent.schema import AgentInput, AgentOutput
+from maciota_bot.agent.schema import AgentOutput, BotInput
 from maciota_bot.state import get_state
 
 logger = logging.getLogger(__name__)
@@ -41,11 +41,11 @@ async def respond(message: discord.Message) -> None:
 def _turn(
     message: discord.Message,
     trigger_type: Literal['mention', 'proactive'],
-) -> AgentInput:
+) -> BotInput:
     channel = message.channel
     guild = message.guild
     assert guild is not None
-    return AgentInput(
+    return BotInput(
         channel_id=channel.id,
         message_id=message.id,
         author_name=message.author.display_name,

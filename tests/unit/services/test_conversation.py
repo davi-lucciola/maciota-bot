@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from maciota_bot.agent.schema import AgentInput, AgentOutput
+from maciota_bot.agent.schema import AgentOutput, BotInput
 from maciota_bot.services.conversation import respond
 from maciota_bot.state import configure, get_state
 from tests.support import make_state
@@ -61,9 +61,9 @@ class _Agent:
     ) -> None:
         self.output = AgentOutput(text=response, reply_to_message_id=reply_to)
         self.fail = fail
-        self.calls: list[AgentInput] = []
+        self.calls: list[BotInput] = []
 
-    async def execute(self, turn: AgentInput) -> AgentOutput:
+    async def execute(self, turn: BotInput) -> AgentOutput:
         self.calls.append(turn)
         if self.fail:
             raise RuntimeError('model down')
@@ -75,8 +75,8 @@ def _publish(agent: _Agent) -> None:
     configure(make_state(current.engine, agent=agent))
 
 
-def _turn(*, trigger_type: str, content: str) -> AgentInput:
-    return AgentInput(
+def _turn(*, trigger_type: str, content: str) -> BotInput:
+    return BotInput(
         channel_id=7,
         message_id=99,
         author_name='Ada',

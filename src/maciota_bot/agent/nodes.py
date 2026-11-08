@@ -2,6 +2,7 @@ import logging
 
 from langchain.chat_models import BaseChatModel
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
+from pydantic import Field
 
 from maciota_bot.agent.prompt import (
     PERSONA_PROMPT,
@@ -11,7 +12,7 @@ from maciota_bot.agent.prompt import (
     server_context,
     trigger_instruction,
 )
-from maciota_bot.agent.schema import TriggerAction, TriggerDecision
+from maciota_bot.agent.schema import BotInput, TriggerAction, TriggerDecision
 from maciota_bot.agent.state import BotState
 
 logger = logging.getLogger(__name__)
@@ -42,21 +43,48 @@ def message_id_at(state: BotState, index: int | None) -> int | None:
     return int(message.id)
 
 
+class _TriggerInput(BotInput):
+    messages: list = Field(default_factory=list)
+
+
+def turn_state(turn: _TriggerInput) -> BotState:
+    incoming = HumanMessage(
+        content=f'{turn.author_name}: {turn.content}',
+        id=str(turn.message_id),
+    )
+    return {
+        'messages': [*turn.messages, incoming],
+        'channel_id': turn.channel_id,
+        'message_id': turn.message_id,
+        'author_name': turn.author_name,
+        'trigger_type': turn.trigger_type,
+        'guild_name': turn.guild_name,
+        'guild_description': turn.guild_description,
+        'channel_name': turn.channel_name,
+        'channel_topic': turn.channel_topic,
+        'context_hook': '',
+        'persona_style': '',
+        'final_response': '',
+        'reply_to_message_id': None,
+        'approved': False,
+    }
+
+
 def make_nodes(
     light_model: BaseChatModel,
     reply_model: BaseChatModel,
 ) -> tuple:
-    async def evaluate_trigger(state: BotState) -> dict[str, object]:
-        if state['trigger_type'] == 'mention':
+    async def evaluate_trigger(turn: _TriggerInput) -> BotState:
+        state = turn_state(turn)
+        if turn.trigger_type == 'mention':
             logger.debug(
                 'Decisão: mention, enviar resposta à mensagem %s',
-                state['message_id'],
+                turn.message_id,
             )
-            return {
-                'approved': True,
-                'context_hook': '',
-                'reply_to_message_id': state['message_id'],
-            }
+            state['approved'] = True
+            state['context_hook'] = ''
+            state['reply_to_message_id'] = turn.message_id
+            return state
 
         structured = light_model.with_structured_output(TriggerDecision)
         decision = await structured.ainvoke(
@@ -70,12 +98,11 @@ def make_nodes(
 
         if decision.action == TriggerAction.SILENCE:
             logger.debug('Decisão: silence, não enviar. %s', decision.reasoning)
-            return {
-                'approved': False,
-                'context_hook': '',
-                'final_response': '',
-                'reply_to_message_id': None,
-            }
+            state['approved'] = False
+            state['context_hook'] = ''
+            state['final_response'] = ''
+            state['reply_to_message_id'] = None
+            return state
 
         reply_to = None
         if decision.action == TriggerAction.REPLY:
@@ -87,11 +114,10 @@ def make_nodes(
             reply_to,
             decision.reasoning,
         )
-        return {
-            'approved': True,
-            'context_hook': decision.hook,
-            'reply_to_message_id': reply_to,
-        }
+        state['approved'] = True
+        state['context_hook'] = decision.hook
+        state['reply_to_message_id'] = reply_to
+        return state
 
     async def persona_router(state: BotState) -> dict[str, str]:
         reply = await light_model.ainvoke(model_input(state, PERSONA_PROMPT))

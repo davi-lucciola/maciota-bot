@@ -1,7 +1,6 @@
 from enum import StrEnum
 from typing import Literal
 
-from langchain.messages import HumanMessage
 from pydantic import BaseModel, Field
 
 
@@ -21,29 +20,34 @@ class TriggerDecision(BaseModel):
     reasoning: str = Field(
         description=(
             'Primeiro campo. Uma ou duas frases sobre o que está '
-            'acontecendo e se existe gancho para comentar.'
+            'acontecendo e por que entrar ou ficar quieto. O padrão é '
+            'silence.'
         )
     )
     action: TriggerAction = Field(
         description=(
-            'Depois do raciocínio. silence = não enviar. '
-            'channel = mensagem geral no canal. '
+            'Depois do raciocínio. silence = não enviar, e é o padrão. '
+            'channel = mensagem geral no canal, só quando a fala é pra '
+            'sala inteira e não cabe marcar ninguém. '
             'reply = responder a mensagem de uma pessoa da lista.'
         )
     )
     message_index: int | None = Field(
         description=(
-            'Se action for reply, o índice da mensagem da pessoa na '
-            'janela numerada, começando em 0 na mais antiga. '
-            'Nos outros casos, null.'
+            'Se action for reply, o índice de uma mensagem de pessoa na '
+            'janela numerada, começando em 0 na mais antiga. Nunca o '
+            'índice de uma linha Maciota (você). Nos outros casos, null.'
         )
     )
     hook: str = Field(
-        description='Uma frase com o gancho. Vazio se action for silence.'
+        description=(
+            'O que responder, numa frase, sem resumir o que acabou de '
+            'acontecer. Vazio se action for silence.'
+        )
     )
 
 
-class AgentInput(BaseModel):
+class BotInput(BaseModel):
     channel_id: int
     message_id: int
     author_name: str
@@ -53,29 +57,6 @@ class AgentInput(BaseModel):
     guild_description: str | None = None
     channel_name: str | None = None
     channel_topic: str | None = None
-
-    def to_state(self) -> dict[str, object]:
-        return {
-            'messages': [
-                HumanMessage(
-                    content=f'{self.author_name}: {self.content}',
-                    id=str(self.message_id),
-                )
-            ],
-            'channel_id': self.channel_id,
-            'message_id': self.message_id,
-            'author_name': self.author_name,
-            'trigger_type': self.trigger_type,
-            'guild_name': self.guild_name,
-            'guild_description': self.guild_description,
-            'channel_name': self.channel_name,
-            'channel_topic': self.channel_topic,
-            'context_hook': '',
-            'persona_style': '',
-            'final_response': '',
-            'reply_to_message_id': None,
-            'approved': False,
-        }
 
 
 class AgentOutput(BaseModel):

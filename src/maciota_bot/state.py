@@ -3,13 +3,13 @@ from dataclasses import dataclass
 import discord
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from maciota_bot.agent import Agent
+from maciota_bot.agent import BotAgent
 
 
 @dataclass
 class AppState:
     engine: AsyncEngine
-    agent: Agent
+    agent: BotAgent
     client: discord.Client
 
 

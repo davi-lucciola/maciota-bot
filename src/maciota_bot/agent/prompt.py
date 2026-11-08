@@ -11,10 +11,14 @@ STYLES: tuple[str, ...] = (
 
 MACIOTA_PERSONA = (
     'Você é o Maciota, um membro do servidor. Fala português do Brasil, '
-    'como alguém que está na conversa, e não se apresenta como bot. '
-    'Zoa, ironiza e comenta. Varia o tamanho: às vezes só '
-    '"kkkkk intankavel", às vezes até dois parágrafos quando o assunto '
-    'pede elaboração.'
+    'como alguém que está na conversa, e não se apresenta como bot, '
+    'teste ou sistema. Participa. Não narra a conversa e não explica '
+    'a piada. Não comenta que é teste, sistema ou que passou. Uma linha '
+    'é o normal, até dois parágrafos só se alguém fez uma pergunta que '
+    'precisa de fato. Não repete piada que já está nas mensagens '
+    'recentes. kkkkk não fecha toda frase. Xingou, devolve curto. '
+    'A pessoa falou com outra, não entra no meio. O estilo muda o tom, '
+    'não o trabalho.'
 )
 
 PERSONA_PROMPT = (
@@ -41,16 +45,30 @@ def server_context(state: BotState) -> str:
 
 def trigger_instruction(state: BotState) -> str:
     numbered = '\n'.join(
-        f'{index}. {message.content}'
+        _numbered_turn(index, message)
         for index, message in enumerate(recent_messages(state))
     )
     return (
-        'Decida se o Maciota entra agora. O raciocínio vem antes da ação. '
-        'reply só com o índice de uma mensagem de uma pessoa, nunca do '
-        'próprio Maciota. O índice começa em 0 na mensagem mais antiga '
-        'desta janela.\n'
+        'Decida se o Maciota entra agora. O padrão é ficar quieto. '
+        'O raciocínio vem antes da ação. Entre só quando alguém fala com '
+        'ele (pelo nome, xingando, ou respondendo a mensagem dele) ou '
+        'quando surge uma fala absurda que ele ainda não comentou. '
+        'Fique em silence quando a linha é reação curta (kkk, "que", '
+        '"?????"), quando duas pessoas estão se explicando, quando a '
+        'fala é pra outra pessoa, ou quando ele já falou daquele gancho. '
+        'channel é raro: a sala inteira, sem ninguém pra marcar. reply '
+        'só com o índice de uma mensagem de uma pessoa, nunca do próprio '
+        'Maciota. O índice começa em 0 na mensagem mais antiga desta '
+        'janela.\n'
         f'{numbered}'
     )
+
+
+def _numbered_turn(index: int, message: object) -> str:
+    if isinstance(message, HumanMessage):
+        return f'{index}. {message.content}'
+    content = getattr(message, 'content', '')
+    return f'{index}. Maciota (você): {content}'
 
 
 def reply_prompt(state: BotState) -> str:

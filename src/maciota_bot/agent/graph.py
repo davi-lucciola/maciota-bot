@@ -4,9 +4,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from maciota_bot.agent.nodes import make_nodes
+from maciota_bot.agent.schema import BotInput
 from maciota_bot.agent.state import BotState
 
-type BotGraph = CompiledStateGraph[BotState, None, BotState, BotState]
+type BotGraph = CompiledStateGraph[BotState, None, BotInput, BotState]
 
 
 def route_after_trigger(state: BotState) -> str:
@@ -25,7 +26,7 @@ def build_graph(
         reply_model,
     )
 
-    graph = StateGraph(BotState)
+    graph = StateGraph(BotState, input_schema=BotInput)
     graph.add_node('evaluate_trigger', evaluate_trigger)
     graph.add_node('persona_router', persona_router)
     graph.add_node('generate_response', generate_response)

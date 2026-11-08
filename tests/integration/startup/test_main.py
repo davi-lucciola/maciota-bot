@@ -5,7 +5,7 @@ from pathlib import Path
 import discord
 import pytest
 
-from maciota_bot.agent import Agent
+from maciota_bot.agent import BotAgent
 from maciota_bot.client import MaciotaClient
 from maciota_bot.client.events import on_member_join, on_message
 from maciota_bot.main import main
@@ -119,7 +119,7 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         client = captured['client']
         assert isinstance(client, MaciotaClient)
         await client.on_ready()
-        assert isinstance(get_state().agent, Agent)
+        assert isinstance(get_state().agent, BotAgent)
         assert (tmp_path / 'data' / 'maciota.db').is_file()
         channel = _Channel()
         member = _Member('<@42>', channel=channel)
@@ -171,7 +171,7 @@ async def test_main_syncs_the_welcome_command_when_ready(
         assert isinstance(client, MaciotaClient)
         client_logger.addHandler(handler)
         await client.on_ready()
-        assert isinstance(get_state().agent, Agent)
+        assert isinstance(get_state().agent, BotAgent)
         assert order == ['sync', 'log']
         command = client.tree.get_command('boas-vindas')
         assert command is not None

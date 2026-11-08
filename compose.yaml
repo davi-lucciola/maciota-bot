@@ -1,0 +1,8 @@
+services:
+  maciota-bot:
+    build: .
+    user: "0:0"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data

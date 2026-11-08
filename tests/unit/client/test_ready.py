@@ -1,4 +1,6 @@
+import io
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -25,6 +27,7 @@ async def test_on_ready_syncs_then_logs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
     order: list[str] = []
     client = MaciotaClient()
     client.tree = _Tree(order)
@@ -46,6 +49,7 @@ async def test_on_ready_creates_the_welcome_table(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    (tmp_path / 'data').mkdir()
     client = MaciotaClient()
     client.tree = _Tree([])
 
@@ -59,3 +63,61 @@ async def test_on_ready_creates_the_welcome_table(
     async with get_state().engine.connect() as connection:
         names = await connection.run_sync(table_names)
     assert GuildWelcomeChannel.__tablename__ in names
+
+
+def _record_exit(exited: list[int]) -> Callable[[int], None]:
+    def record(code: int) -> None:
+        exited.append(code)
+
+    return record
+
+
+def _capture(name: str) -> tuple[logging.Logger, io.StringIO, logging.Handler]:
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    logger = logging.getLogger(name)
+    logger.addHandler(handler)
+    logger.setLevel(logging.ERROR)
+    return logger, stream, handler
+
+
+async def test_on_ready_error_logs_to_the_console_and_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    exited: list[int] = []
+    monkeypatch.setattr(os, '_exit', _record_exit(exited))
+    bot_logger, console, bot_handler = _capture('maciota_bot')
+    discord_logger, discord_log, discord_handler = _capture('discord')
+    client = MaciotaClient()
+    try:
+        raise RuntimeError('unable to open database file')
+    except RuntimeError:
+        await client.on_error('on_ready')
+    finally:
+        bot_logger.removeHandler(bot_handler)
+        discord_logger.removeHandler(discord_handler)
+        bot_logger.setLevel(logging.NOTSET)
+        discord_logger.setLevel(logging.NOTSET)
+
+    assert exited == [1]
+    assert 'unable to open database file' in console.getvalue()
+    assert 'unable to open database file' in discord_log.getvalue()
+
+
+async def test_other_event_errors_do_not_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    exited: list[int] = []
+    monkeypatch.setattr(os, '_exit', _record_exit(exited))
+    client = MaciotaClient()
+
+    try:
+        raise RuntimeError('message failed')
+    except RuntimeError:
+        await client.on_error('on_message')
+
+    assert exited == []

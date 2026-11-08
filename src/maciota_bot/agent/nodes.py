@@ -1,3 +1,5 @@
+import logging
+
 from langchain.chat_models import BaseChatModel
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -11,6 +13,8 @@ from maciota_bot.agent.prompt import (
 )
 from maciota_bot.agent.schema import TriggerAction, TriggerDecision
 from maciota_bot.agent.state import BotState
+
+logger = logging.getLogger(__name__)
 
 
 def model_input(state: BotState, instruction: str) -> list:
@@ -44,6 +48,10 @@ def make_nodes(
 ) -> tuple:
     async def evaluate_trigger(state: BotState) -> dict[str, object]:
         if state['trigger_type'] == 'mention':
+            logger.debug(
+                'Decisão: mention, enviar resposta à mensagem %s',
+                state['message_id'],
+            )
             return {
                 'approved': True,
                 'context_hook': '',
@@ -54,11 +62,14 @@ def make_nodes(
         decision = await structured.ainvoke(
             model_input(state, trigger_instruction(state))
         )
+
         if not isinstance(decision, TriggerDecision):
             raise TypeError(
                 f'Esperado TriggerDecision da LLM, recebido {type(decision).__name__}'
             )
+
         if decision.action == TriggerAction.SILENCE:
+            logger.debug('Decisão: silence, não enviar. %s', decision.reasoning)
             return {
                 'approved': False,
                 'context_hook': '',
@@ -69,6 +80,13 @@ def make_nodes(
         reply_to = None
         if decision.action == TriggerAction.REPLY:
             reply_to = message_id_at(state, decision.message_index)
+        logger.debug(
+            'Decisão: %s, enviar. gancho=%s reply_to=%s. %s',
+            decision.action,
+            decision.hook,
+            reply_to,
+            decision.reasoning,
+        )
         return {
             'approved': True,
             'context_hook': decision.hook,
@@ -77,11 +95,14 @@ def make_nodes(
 
     async def persona_router(state: BotState) -> dict[str, str]:
         reply = await light_model.ainvoke(model_input(state, PERSONA_PROMPT))
-        return {'persona_style': select_style(_text(reply))}
+        style = select_style(_text(reply))
+        logger.debug('Estilo escolhido: %s', style)
+        return {'persona_style': style}
 
     async def generate_response(state: BotState) -> dict[str, object]:
         reply = await reply_model.ainvoke(model_input(state, reply_prompt(state)))
         text = _text(reply).strip()
+        logger.debug('Resposta gerada: %s', text)
         return {
             'final_response': text,
             'messages': [AIMessage(content=text)],

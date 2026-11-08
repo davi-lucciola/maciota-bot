@@ -1,6 +1,8 @@
+import logging
 from pathlib import Path
 
 import aiosqlite
+import pytest
 from langchain.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -94,7 +96,10 @@ def _conversation(messages: list[object]) -> list[str]:
     ]
 
 
-async def test_mention_skips_the_hook_and_returns_the_reply() -> None:
+async def test_mention_skips_the_hook_and_returns_the_reply(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger='maciota_bot.agent.nodes')
     light = ScriptedModel(['ironia curta'])
     reply = ScriptedModel(['kkkkk intankavel'])
     agent = _agent(light, reply)
@@ -102,6 +107,9 @@ async def test_mention_skips_the_hook_and_returns_the_reply() -> None:
     text = await _say(agent, 'e ai', guild_name='Maciota', channel_name='geral')
 
     assert text.text == 'kkkkk intankavel'
+    assert 'Decisão: mention, enviar resposta à mensagem 1' in caplog.text
+    assert 'Estilo escolhido: ironia curta' in caplog.text
+    assert 'Resposta gerada: kkkkk intankavel' in caplog.text
     assert text.reply_to_message_id == 1
     assert len(light.seen) == 1
     assert 'Decida se o Maciota entra' not in _system(light.seen[0])
@@ -112,7 +120,10 @@ async def test_mention_skips_the_hook_and_returns_the_reply() -> None:
     assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[0])
 
 
-async def test_proactive_refusal_sends_nothing() -> None:
+async def test_proactive_refusal_sends_nothing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger='maciota_bot.agent.nodes')
     light = ScriptedModel([
         TriggerDecision(
             reasoning='não tem gancho',
@@ -128,6 +139,7 @@ async def test_proactive_refusal_sends_nothing() -> None:
 
     assert not text.text
     assert text.reply_to_message_id is None
+    assert 'Decisão: silence, não enviar. não tem gancho' in caplog.text
     assert len(light.seen) == 1
     assert 'Decida se o Maciota entra' in _system(light.seen[0])
     assert reply.seen == []
@@ -155,7 +167,10 @@ async def test_proactive_channel_message_reaches_the_reply() -> None:
     assert 'Mensagem geral no canal' in _system(reply.seen[0])
 
 
-async def test_proactive_reply_uses_the_message_id() -> None:
+async def test_proactive_reply_uses_the_message_id(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger='maciota_bot.agent.nodes')
     light = ScriptedModel([
         'ironia curta',
         TriggerDecision(
@@ -180,6 +195,10 @@ async def test_proactive_reply_uses_the_message_id() -> None:
     assert text.text == 'de novo'
     assert text.reply_to_message_id == 10
     assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[-1])
+    assert (
+        'Decisão: reply, enviar. gancho=o controle sumiu reply_to=10. '
+        'a Ada perdeu o controle'
+    ) in caplog.text
 
 
 async def test_invalid_reply_index_falls_back_to_the_channel() -> None:

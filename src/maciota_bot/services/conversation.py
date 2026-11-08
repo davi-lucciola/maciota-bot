@@ -13,9 +13,18 @@ async def respond(message: discord.Message) -> None:
     if message.author.bot or message.guild is None:
         return
 
+    guild = message.guild
+    logger.debug(
+        'Mensagem recebida no servidor %s de %s: %s',
+        guild.name,
+        message.author.display_name,
+        message.content,
+    )
+
     state = get_state()
     agent = state.agent
     if agent is None:
+        logger.debug('Agente indisponível, mensagem não será enviada')
         return
 
     user = state.client.user
@@ -51,15 +60,22 @@ def _turn(
 
 async def _send_output(message: discord.Message, output: AgentOutput) -> None:
     if not output.text.strip():
+        logger.debug('Decisão: não enviar, resposta vazia')
         return
 
     reference = None
     guild = message.guild
     assert guild is not None
     if output.reply_to_message_id is not None:
+        logger.debug(
+            'Decisão: enviar resposta à mensagem %s',
+            output.reply_to_message_id,
+        )
         reference = discord.MessageReference(
             message_id=output.reply_to_message_id,
             channel_id=message.channel.id,
             guild_id=guild.id,
         )
+    else:
+        logger.debug('Decisão: enviar mensagem no canal')
     await message.channel.send(output.text, reference=reference)

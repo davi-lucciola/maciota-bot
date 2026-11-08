@@ -1,3 +1,7 @@
+import logging
+
+import pytest
+
 from maciota_bot.agent.schema import AgentInput, AgentOutput
 from maciota_bot.services.conversation import respond
 from maciota_bot.state import configure, get_state
@@ -107,7 +111,10 @@ async def test_direct_message_receives_no_reply() -> None:
     assert agent.calls == []
 
 
-async def test_mention_replies_to_the_message() -> None:
+async def test_mention_replies_to_the_message(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger='maciota_bot.services.conversation')
     agent = _Agent('cheguei', reply_to=99)
     _publish(agent)
     message = _Message('e ai', mentioned=True)
@@ -117,9 +124,14 @@ async def test_mention_replies_to_the_message() -> None:
     assert message.channel.sent == ['cheguei']
     assert message.channel.references[0].message_id == 99
     assert agent.calls == [_turn(trigger_type='mention', content='e ai')]
+    assert 'Mensagem recebida no servidor Servidor de Ada: e ai' in caplog.text
+    assert 'Decisão: enviar resposta à mensagem 99' in caplog.text
 
 
-async def test_ordinary_text_is_a_channel_message() -> None:
+async def test_ordinary_text_is_a_channel_message(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger='maciota_bot.services.conversation')
     agent = _Agent('kkk')
     _publish(agent)
     message = _Message('!ping')
@@ -129,9 +141,13 @@ async def test_ordinary_text_is_a_channel_message() -> None:
     assert agent.calls == [_turn(trigger_type='proactive', content='!ping')]
     assert message.channel.sent == ['kkk']
     assert message.channel.references == [None]
+    assert 'Decisão: enviar mensagem no canal' in caplog.text
 
 
-async def test_empty_response_sends_nothing() -> None:
+async def test_empty_response_sends_nothing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger='maciota_bot.services.conversation')
     agent = _Agent('   ')
     _publish(agent)
     message = _Message('hello')
@@ -139,6 +155,7 @@ async def test_empty_response_sends_nothing() -> None:
     await respond(message)
 
     assert message.channel.sent == []
+    assert 'Decisão: não enviar, resposta vazia' in caplog.text
 
 
 async def test_agent_failure_sends_nothing() -> None:

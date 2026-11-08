@@ -1,6 +1,6 @@
 [project]
 name = "maciota-bot"
-version = "0.1.0"
+version = "0.1.1"
 description = "Discord bot that joins a guild channel in Brazilian Portuguese and welcomes new members."
 readme = "README.md"
 authors = [

@@ -12,7 +12,9 @@ It speaks Brazilian Portuguese and stays quiet by default. A mention makes it re
 
 A new member who is not a bot gets a short joke in Brazilian Portuguese. The message goes to the channel saved for that server. If none is saved, it goes to the server's system channel. If that channel is also missing, nothing is sent.
 
-`/boas-vindas` only runs in a server. An administrator sets the welcome channel with that command and a text channel in the same server. The confirmation is ephemeral. Anyone who is not an administrator, or a channel from another server, gets a refusal.
+`/welcome` only runs in a server. An administrator sets the welcome channel with that command and a text channel in the same server. The confirmation is ephemeral. Anyone who is not an administrator, or a channel from another server, gets a refusal.
+
+`/acidity` only runs in a server. An administrator sets how sharp Maciota is: `mild`, `medium`, or `sharp`. A server that has never set it uses `medium`. A higher level is more ironic and more willing to swear. The confirmation is ephemeral. Anyone who is not an administrator gets a refusal.
 
 ## Requirements
 

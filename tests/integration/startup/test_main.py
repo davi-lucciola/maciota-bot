@@ -175,13 +175,27 @@ async def test_main_syncs_the_welcome_command_when_ready(
         await client.on_ready()
         assert isinstance(get_state().agent, BotAgent)
         assert order == ['sync', 'log']
-        command = client.tree.get_command('boas-vindas')
-        assert command is not None
-        assert command.name == 'boas-vindas'
-        assert command.guild_only is True
-        assert command.default_permissions is not None
-        assert command.default_permissions.administrator is True
-        assert command.get_parameter('canal') is not None
+        welcome = client.tree.get_command('welcome')
+        assert welcome is not None
+        assert welcome.name == 'welcome'
+        assert welcome.guild_only is True
+        assert welcome.default_permissions is not None
+        assert welcome.default_permissions.administrator is True
+        assert welcome.get_parameter('channel') is not None
+        acidity = client.tree.get_command('acidity')
+        assert acidity is not None
+        assert acidity.name == 'acidity'
+        assert acidity.guild_only is True
+        assert acidity.default_permissions is not None
+        assert acidity.default_permissions.administrator is True
+        level = acidity.get_parameter('level')
+        assert level is not None
+        assert {choice.value for choice in level.choices} == {
+            'mild',
+            'medium',
+            'sharp',
+        }
+        assert client.tree.get_command('boas-vindas') is None
     finally:
         client_logger.removeHandler(handler)
         await release_engine()

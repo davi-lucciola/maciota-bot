@@ -3,11 +3,20 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+type Acidity = Literal['mild', 'medium', 'sharp']
+
 
 class TriggerAction(StrEnum):
     SILENCE = 'silence'
     CHANNEL = 'channel'
     REPLY = 'reply'
+
+
+class PersonaStyle(StrEnum):
+    IRONIA_CURTA = 'ironia curta'
+    ZOEIRA_DIRETA = 'zoeira direta'
+    EXPLICATIVA = 'explicativa'
+    BORDAO = 'bordão'
 
 
 class TriggerDecision(BaseModel):
@@ -19,9 +28,9 @@ class TriggerDecision(BaseModel):
 
     reasoning: str = Field(
         description=(
-            'Primeiro campo. Uma ou duas frases sobre o que está '
-            'acontecendo e por que entrar ou ficar quieto. O padrão é '
-            'silence.'
+            'Discorra em um breve parágrafo sobre o que está '
+            'acontecendo na conversa e por que entrar ou ficar quieto. '
+            'O padrão é silence.'
         )
     )
     action: TriggerAction = Field(
@@ -47,6 +56,27 @@ class TriggerDecision(BaseModel):
     )
 
 
+class StyleDecision(BaseModel):
+    """Escolhe o tom desta resposta.
+
+    Os campos seguem a ordem em que o modelo preenche: primeiro o
+    raciocínio, depois o estilo.
+    """
+
+    reasoning: str = Field(
+        description=(
+            'Discorra em um breve parágrafo sobre a conversa que está '
+            'acontecendo e avalie os sentimentos e o tom dos usuários.'
+        )
+    )
+    style: PersonaStyle = Field(
+        description=(
+            'Dado os sentimentos e o tom dos usuários escolha o estilo adequado '
+            'para a resposta ironia curta, zoeira direta, explicativa ou bordão.'
+        )
+    )
+
+
 class BotInput(BaseModel):
     channel_id: int
     message_id: int
@@ -57,6 +87,7 @@ class BotInput(BaseModel):
     guild_description: str | None = None
     channel_name: str | None = None
     channel_topic: str | None = None
+    acidity: Acidity = 'medium'
 
 
 class AgentOutput(BaseModel):

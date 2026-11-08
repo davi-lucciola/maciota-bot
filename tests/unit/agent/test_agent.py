@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 import aiosqlite
+import langgraph.checkpoint.serde.jsonplus as checkpoint_serde
 import pytest
 from langchain.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -10,8 +11,11 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from maciota_bot.agent import BotAgent
 from maciota_bot.agent.schema import (
+    Acidity,
     AgentOutput,
     BotInput,
+    PersonaStyle,
+    StyleDecision,
     TriggerAction,
     TriggerDecision,
 )
@@ -53,6 +57,24 @@ class _Structured:
         return item
 
 
+class _Loose:
+    def __init__(self, model: ScriptedModel) -> None:
+        self._model = model
+
+    async def ainvoke(self, messages: list[object]) -> object:
+        self._model.seen.append(list(messages))
+        return self._model._next()
+
+
+class _LooseModel(ScriptedModel):
+    def with_structured_output(self, schema: type[object]) -> _Loose:
+        return _Loose(self)
+
+
+def _style(style: str) -> StyleDecision:
+    return StyleDecision(reasoning='tom', style=style)
+
+
 def _agent(light: ScriptedModel, reply: ScriptedModel) -> BotAgent:
     return BotAgent(
         checkpointer=MemorySaver(),
@@ -70,6 +92,7 @@ async def _say(
     trigger_type: str = 'mention',
     guild_name: str | None = None,
     channel_name: str | None = None,
+    acidity: Acidity = 'medium',
 ) -> AgentOutput:
     return await agent.execute(
         BotInput(
@@ -80,6 +103,7 @@ async def _say(
             trigger_type=trigger_type,
             guild_name=guild_name,
             channel_name=channel_name,
+            acidity=acidity,
         )
     )
 
@@ -101,12 +125,13 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.DEBUG, logger='maciota_bot.agent.nodes')
-    light = ScriptedModel(['ironia curta'])
+    light = ScriptedModel([_style('ironia curta')])
     reply = ScriptedModel(['kkkkk intankavel'])
     agent = _agent(light, reply)
 
     text = await _say(agent, 'e ai', guild_name='Maciota', channel_name='geral')
 
+    system = _system(reply.seen[0])
     assert text.text == 'kkkkk intankavel'
     assert 'Decisão: mention, enviar resposta à mensagem 1' in caplog.text
     assert 'Estilo escolhido: ironia curta' in caplog.text
@@ -114,12 +139,31 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
     assert text.reply_to_message_id == 1
     assert len(light.seen) == 1
     assert 'Decida se o Maciota entra' not in _system(light.seen[0])
-    assert 'ironia curta' in _system(reply.seen[0])
-    assert 'Não narra' in _system(reply.seen[0])
-    assert 'dois parágrafos' in _system(reply.seen[0])
-    assert 'Servidor: Maciota.' in _system(reply.seen[0])
-    assert 'Canal: geral.' in _system(reply.seen[0])
-    assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[0])
+    assert 'Estilo desta resposta: ironia curta.' in system
+    assert 'rir' in system
+    assert 'piada' in system
+    assert 'zoar' in system
+    assert 'informação pela metade' in system
+    assert '**negrito**' in system
+    assert 'dois parágrafos' in system
+    assert 'você que some no meio da partida.' in system
+    assert system.count('Maciota:') == 5
+    assert 'Bia:' in system
+    assert 'Servidor: Maciota.' in system
+    assert 'Canal: geral.' in system
+    assert 'Você está respondendo a mensagem de Ada.' in system
+    headings = (
+        'Quem você é',
+        'Como fala',
+        'Tamanho',
+        'Limites',
+        'Formatação',
+        'Acidez',
+        'Exemplos',
+    )
+    assert [system.index(heading) for heading in headings] == sorted(
+        system.index(heading) for heading in headings
+    )
 
 
 async def test_proactive_refusal_sends_nothing(
@@ -148,7 +192,10 @@ async def test_proactive_refusal_sends_nothing(
     assert reply.seen == []
 
 
-async def test_proactive_channel_message_reaches_the_reply() -> None:
+async def test_proactive_channel_message_reaches_the_reply(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger='maciota_bot.agent.nodes')
     light = ScriptedModel([
         TriggerDecision(
             reasoning='o controle sumiu',
@@ -156,7 +203,7 @@ async def test_proactive_channel_message_reaches_the_reply() -> None:
             message_index=None,
             hook='o controle sumiu',
         ),
-        'zoeira direta',
+        _style('zoeira direta'),
     ])
     reply = ScriptedModel(['sumiu mesmo'])
     agent = _agent(light, reply)
@@ -166,8 +213,9 @@ async def test_proactive_channel_message_reaches_the_reply() -> None:
     assert text.text == 'sumiu mesmo'
     assert text.reply_to_message_id is None
     assert 'o controle sumiu' in _system(reply.seen[0])
-    assert 'zoeira direta' in _system(reply.seen[0])
+    assert 'Estilo desta resposta: zoeira direta.' in _system(reply.seen[0])
     assert 'Mensagem geral no canal' in _system(reply.seen[0])
+    assert 'Estilo escolhido: zoeira direta' in caplog.text
 
 
 async def test_proactive_reply_uses_the_message_id(
@@ -175,14 +223,14 @@ async def test_proactive_reply_uses_the_message_id(
 ) -> None:
     caplog.set_level(logging.DEBUG, logger='maciota_bot.agent.nodes')
     light = ScriptedModel([
-        'ironia curta',
+        _style('ironia curta'),
         TriggerDecision(
             reasoning='a Ada perdeu o controle',
             action=TriggerAction.REPLY,
             message_index=0,
             hook='o controle sumiu',
         ),
-        'zoeira direta',
+        _style('zoeira direta'),
     ])
     reply = ScriptedModel(['sumiu mesmo', 'de novo'])
     agent = _agent(light, reply)
@@ -213,7 +261,7 @@ async def test_invalid_reply_index_falls_back_to_the_channel() -> None:
             message_index=9,
             hook='o controle sumiu',
         ),
-        'zoeira direta',
+        _style('zoeira direta'),
     ])
     reply = ScriptedModel(['sumiu mesmo'])
     agent = _agent(light, reply)
@@ -226,7 +274,7 @@ async def test_invalid_reply_index_falls_back_to_the_channel() -> None:
 
 
 async def test_model_sees_only_the_last_thirty_messages() -> None:
-    light = ScriptedModel(['ironia curta'])
+    light = ScriptedModel([_style('ironia curta')])
     reply = ScriptedModel(['ok'])
     agent = _agent(light, reply)
 
@@ -240,8 +288,12 @@ async def test_model_sees_only_the_last_thirty_messages() -> None:
     assert len(_conversation(light.seen[-1])) == 30
 
 
-async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
-    light = ScriptedModel(['ironia curta'])
+async def test_sqlite_thread_is_per_channel(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger='langgraph.checkpoint.serde.jsonplus')
+    light = ScriptedModel([_style('ironia curta')])
     reply = ScriptedModel(['ok'])
     connection = await aiosqlite.connect(tmp_path / 'checkpoints.db')
     saver = AsyncSqliteSaver(connection)
@@ -249,7 +301,10 @@ async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
     agent = BotAgent(light_model=light, reply_model=reply, checkpointer=saver)
     try:
         await _say(agent, 'segredo', channel_id=1, message_id=1)
+        caplog.clear()
+        checkpoint_serde._warned_unregistered_types.clear()
         await _say(agent, 'de novo', channel_id=1, message_id=2)
+        assert 'PersonaStyle' not in caplog.text
         assert 'Ada: segredo' in _conversation(reply.seen[-1])
 
         await _say(agent, 'outro', channel_id=2, message_id=3)
@@ -290,13 +345,13 @@ async def test_same_channel_turns_do_not_overlap() -> None:
     entered = asyncio.Event()
     release = asyncio.Event()
     second_entered = asyncio.Event()
-    light = _HoldingModel(
-        ['ironia curta', 'ironia curta'],
+    light = ScriptedModel([_style('ironia curta')])
+    reply = _HoldingModel(
+        ['primeiro', 'segundo'],
         entered,
         release,
         second_entered,
     )
-    reply = ScriptedModel(['primeiro', 'segundo'])
     agent = _agent(light, reply)
 
     first = asyncio.create_task(_say(agent, 'um', message_id=1))
@@ -314,3 +369,51 @@ async def test_same_channel_turns_do_not_overlap() -> None:
         'primeiro',
         'Ada: dois',
     ]
+
+
+def test_style_decision_puts_reasoning_before_style() -> None:
+    assert list(StyleDecision.model_fields) == ['reasoning', 'style']
+    assert [item.value for item in PersonaStyle] == [
+        'ironia curta',
+        'zoeira direta',
+        'explicativa',
+        'bordão',
+    ]
+
+
+async def test_acidity_swaps_the_examples() -> None:
+    light = ScriptedModel([_style('ironia curta')])
+    reply = ScriptedModel(['ok'])
+    agent = _agent(light, reply)
+
+    await _say(agent, 'cadê o controle', message_id=1, acidity='mild')
+    mild = _system(reply.seen[-1])
+    await _say(
+        agent,
+        'cadê o controle',
+        message_id=2,
+        channel_id=2,
+        acidity='sharp',
+    )
+    sharp = _system(reply.seen[-1])
+
+    assert 'não xinga' in mild
+    assert 'chama no canal de voz.' in mild
+    assert mild.count('Maciota:') == 5
+    assert 'Bia:' in mild
+    assert 'cala a boca.' not in mild
+    assert 'pode xingar' in sharp
+    assert 'cala a boca.' in sharp
+    assert sharp.count('Maciota:') == 5
+    assert 'Bia:' in sharp
+
+
+async def test_wrong_style_schema_fails() -> None:
+    light = _LooseModel(['não é schema'])
+    reply = ScriptedModel(['não devia'])
+    agent = _agent(light, reply)
+
+    with pytest.raises(TypeError, match='StyleDecision'):
+        await _say(agent, 'e ai')
+
+    assert reply.seen == []

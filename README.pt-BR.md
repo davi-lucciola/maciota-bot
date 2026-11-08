@@ -12,7 +12,9 @@ Ele fala português do Brasil e fica quieto por padrão. Uma menção faz ele re
 
 Quem entra e não é bot recebe uma piada curta em português do Brasil. A mensagem vai para o canal salvo daquele servidor. Se nenhum foi salvo, vai para o canal de sistema. Se esse canal também não existir, nada é enviado.
 
-`/boas-vindas` só funciona num servidor. Um administrador define o canal de boas-vindas com esse comando e um canal de texto do mesmo servidor. A confirmação é efêmera. Quem não é administrador, ou um canal de outro servidor, recebe uma recusa.
+`/welcome` só funciona num servidor. Um administrador define o canal de boas-vindas com esse comando e um canal de texto do mesmo servidor. A confirmação é efêmera. Quem não é administrador, ou um canal de outro servidor, recebe uma recusa.
+
+`/acidity` só funciona num servidor. Um administrador define o quanto o Maciota é ácido: `mild`, `medium` ou `sharp`. Um servidor que nunca definiu usa `medium`. Quanto mais alto, mais irônico e mais disposto a xingar. A confirmação é efêmera. Quem não é administrador recebe uma recusa.
 
 ## Requisitos
 

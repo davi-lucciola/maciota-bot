@@ -105,7 +105,7 @@ async def test_administrator_writes_the_channel(tmp_path: Path) -> None:
 
     assert await get_welcome_channel_id(7) == 99
     assert interaction.response.messages == [
-        ('Canal de boas-vindas definido para <#99>.', True),
+        ('Welcome channel set to <#99>.', True),
     ]
 
 
@@ -120,7 +120,7 @@ async def test_non_administrator_does_not_write(tmp_path: Path) -> None:
 
     assert await get_welcome_channel_id(7) is None
     assert interaction.response.messages == [
-        ('Só administradores podem definir o canal de boas-vindas.', True),
+        ('Only administrators can set the welcome channel.', True),
     ]
 
 
@@ -134,5 +134,5 @@ async def test_channel_absent_from_the_guild_does_not_write(tmp_path: Path) -> N
 
     assert await get_welcome_channel_id(7) is None
     assert interaction.response.messages == [
-        ('Esse canal não existe neste servidor.', True),
+        ('That channel is not in this server.', True),
     ]

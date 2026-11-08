@@ -139,9 +139,15 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
     assert len(light.seen) == 1
     assert 'Decida se o Maciota entra' not in _system(light.seen[0])
     assert 'Estilo desta resposta: ironia curta.' in system
-    assert 'Não narra' in system
+    assert 'rir' in system
+    assert 'piada' in system
+    assert 'zoar' in system
+    assert 'informação pela metade' in system
+    assert '**negrito**' in system
     assert 'dois parágrafos' in system
-    assert 'sumiu no mesmo lugar de sempre, gênio.' in system
+    assert 'você que some no meio da partida.' in system
+    assert system.count('Maciota:') == 5
+    assert 'Bia:' in system
     assert 'Servidor: Maciota.' in system
     assert 'Canal: geral.' in system
     assert 'Você está respondendo a mensagem de Ada.' in system
@@ -150,6 +156,7 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
         'Como fala',
         'Tamanho',
         'Limites',
+        'Formatação',
         'Acidez',
         'Exemplos',
     )
@@ -383,10 +390,14 @@ async def test_acidity_swaps_the_examples() -> None:
     sharp = _system(reply.seen[-1])
 
     assert 'não xinga' in mild
-    assert 'tá no sofá, onde você deixou.' in mild
-    assert 'porra, de novo? olha o sofá antes de perguntar.' not in mild
+    assert 'chama no canal de voz.' in mild
+    assert mild.count('Maciota:') == 5
+    assert 'Bia:' in mild
+    assert 'cala a boca.' not in mild
     assert 'pode xingar' in sharp
-    assert 'porra, de novo? olha o sofá antes de perguntar.' in sharp
+    assert 'cala a boca.' in sharp
+    assert sharp.count('Maciota:') == 5
+    assert 'Bia:' in sharp
 
 
 async def test_wrong_style_schema_fails() -> None:

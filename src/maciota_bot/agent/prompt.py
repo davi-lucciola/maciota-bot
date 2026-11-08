@@ -1,109 +1,58 @@
+import re
+from functools import cache
+from importlib.resources import files
+
 from langchain.messages import HumanMessage
 
 from maciota_bot.agent.schema import Acidity
 from maciota_bot.agent.state import MESSAGE_WINDOW, BotState
 
-_WHO = (
-    'Quem você é\n'
-    'Você é o Maciota, um membro do servidor. Fala português do Brasil, '
-    'como alguém que está na conversa, e não se apresenta como bot, '
-    'teste ou sistema.'
-)
+_SLOT = re.compile(r'\{\{([a-z0-9_]+)\}\}')
+_PROMPTS = files('maciota_bot.agent').joinpath('prompts')
 
-_VOICE = (
-    'Como fala\n'
-    'Participa. Não narra a conversa e não explica a piada. '
-    'Não comenta que é teste, sistema ou que passou. '
-    'Não repete piada que já está nas mensagens recentes. '
-    'kkkkk não fecha toda frase. '
-    'A pessoa falou com outra, não entra no meio. '
-    'O estilo muda o tom, não o trabalho.'
-)
 
-_LENGTH = (
-    'Tamanho\n'
-    'Uma linha é o normal, até dois parágrafos só se alguém fez uma '
-    'pergunta que precisa de fato.'
-)
+@cache
+def _template(name: str) -> str:
+    parts = name.split('/')
+    parts[-1] = f'{parts[-1]}.md'
+    return _PROMPTS.joinpath(*parts).read_text(encoding='utf-8')
 
-_LIMITS = (
-    'Limites\n'
-    'Xingou, devolve curto. Não entra em conversa que é de outras duas pessoas.'
-)
 
-_ACIDITY: dict[Acidity, str] = {
-    'mild': (
-        'Acidez\n'
-        'Tom leve. A zoeira é curta e sem veneno. não xinga. '
-        'Se alguém xingar, devolve curto e sem palavrão.'
-    ),
-    'medium': (
-        'Acidez\n'
-        'Tom do meio. Ironia na medida da fala, sem aumentar o que '
-        'chegou. Xingou, devolve curto.'
-    ),
-    'sharp': (
-        'Acidez\n'
-        'Tom ácido. A ironia corta e a resposta pesa. pode xingar, '
-        'curto, quando a fala pede ou quando devolvem grosseria.'
-    ),
-}
+def render(name: str, **values: str) -> str:
+    lines = []
+    for line in _template(name).splitlines():
+        filled = _fill(line, values)
+        if filled is not None:
+            lines.append(filled)
+    return '\n'.join(lines).strip()
 
-_EXAMPLES: dict[Acidity, str] = {
-    'mild': (
-        'Exemplos\n'
-        'Pessoa: cadê o controle\n'
-        'Maciota: tá no sofá, onde você deixou.\n'
-        'Pessoa: boa\n'
-        'Maciota: chegou. senta aí.'
-    ),
-    'medium': (
-        'Exemplos\n'
-        'Pessoa: cadê o controle\n'
-        'Maciota: sumiu no mesmo lugar de sempre, gênio.\n'
-        'Pessoa: boa\n'
-        'Maciota: boa. o atraso veio junto?'
-    ),
-    'sharp': (
-        'Exemplos\n'
-        'Pessoa: cadê o controle\n'
-        'Maciota: porra, de novo? olha o sofá antes de perguntar.\n'
-        'Pessoa: boa\n'
-        'Maciota: olha quem apareceu. senta.'
-    ),
-}
 
-PERSONA_PROMPT = (
-    'Escolha o tom desta resposta. O raciocínio vem antes do estilo. '
-    'O estilo muda o tom, não o trabalho.'
-)
+def _fill(line: str, values: dict[str, str]) -> str | None:
+    keys = _SLOT.findall(line)
+    for key in keys:
+        if key not in values:
+            raise KeyError(key)
+    if any(not values[key] for key in keys):
+        return None
+    return _SLOT.sub(lambda match: values[match.group(1)], line)
+
+
+PERSONA_PROMPT = render('style')
 
 
 def persona_for(acidity: Acidity) -> str:
-    return '\n'.join((
-        _WHO,
-        _VOICE,
-        _LENGTH,
-        _LIMITS,
-        _ACIDITY[acidity],
-        _EXAMPLES[acidity],
-    ))
+    return render('persona', acidez=render(f'acidity/{acidity}'))
 
 
 def server_context(state: BotState) -> str:
-    lines = [
-        'Contexto do servidor: você está neste canal do Discord '
-        f'e responde no canal {state["channel_id"]}.'
-    ]
-    if state['guild_name']:
-        lines.append(f'Servidor: {state["guild_name"]}.')
-    if state['guild_description']:
-        lines.append(f'Descrição: {state["guild_description"]}.')
-    if state['channel_name']:
-        lines.append(f'Canal: {state["channel_name"]}.')
-    if state['channel_topic']:
-        lines.append(f'Tópico: {state["channel_topic"]}.')
-    return '\n'.join(lines)
+    return render(
+        'server',
+        channel_id=str(state['channel_id']),
+        guild_name=state['guild_name'] or '',
+        guild_description=state['guild_description'] or '',
+        channel_name=state['channel_name'] or '',
+        channel_topic=state['channel_topic'] or '',
+    )
 
 
 def trigger_instruction(state: BotState) -> str:
@@ -111,20 +60,7 @@ def trigger_instruction(state: BotState) -> str:
         _numbered_turn(index, message)
         for index, message in enumerate(recent_messages(state))
     )
-    return (
-        'Decida se o Maciota entra agora. O padrão é ficar quieto. '
-        'O raciocínio vem antes da ação. Entre só quando alguém fala com '
-        'ele (pelo nome, xingando, ou respondendo a mensagem dele) ou '
-        'quando surge uma fala absurda que ele ainda não comentou. '
-        'Fique em silence quando a linha é reação curta (kkk, "que", '
-        '"?????"), quando duas pessoas estão se explicando, quando a '
-        'fala é pra outra pessoa, ou quando ele já falou daquele gancho. '
-        'channel é raro: a sala inteira, sem ninguém pra marcar. reply '
-        'só com o índice de uma mensagem de uma pessoa, nunca do próprio '
-        'Maciota. O índice começa em 0 na mensagem mais antiga desta '
-        'janela.\n'
-        f'{numbered}'
-    )
+    return render('trigger', mensagens=numbered)
 
 
 def _numbered_turn(index: int, message: object) -> str:
@@ -138,23 +74,20 @@ def reply_prompt(state: BotState) -> str:
     hook = state['context_hook'] or (
         'nenhum gancho separado; responda à mensagem atual'
     )
-    return (
-        f'{persona_for(state["acidity"])}\n'
-        f'Estilo desta resposta: {state["persona_style"]}.\n'
-        f'Gancho: {hook}.\n'
-        f'{reply_audience(state)}'
+    return render(
+        'reply',
+        persona=persona_for(state['acidity']),
+        estilo=state['persona_style'],
+        gancho=hook,
+        audiencia=reply_audience(state),
     )
 
 
 def reply_audience(state: BotState) -> str:
     target = state['reply_to_message_id']
     if target is None:
-        return 'Mensagem geral no canal, sem responder uma mensagem específica.'
-    author = _author_of(state, target)
-    return (
-        f'Você está respondendo a mensagem de {author}. '
-        'O Discord vai marcar essa mensagem.'
-    )
+        return render('audience_channel')
+    return render('audience_reply', autor=_author_of(state, target))
 
 
 def recent_messages(state: BotState) -> list:

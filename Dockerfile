@@ -12,7 +12,7 @@ RUN uv sync --frozen --no-install-project --no-dev
 COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
-FROM python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72 AS runtime
+FROM python:3.13-slim AS runtime
 
 RUN groupadd --system --gid 999 maciota \
     && useradd --system --gid 999 --uid 999 --create-home --home-dir /home/maciota maciota
@@ -21,13 +21,10 @@ WORKDIR /app
 
 COPY --from=builder --chown=maciota:maciota /app/.venv /app/.venv
 
-RUN mkdir -p /app/data \
-    && chown maciota:maciota /app /app/data
+RUN chown maciota:maciota /app
 
 ENV PATH="/app/.venv/bin:$PATH"
 
 USER maciota
-
-VOLUME ["/app/data"]
 
 CMD ["maciota-bot"]

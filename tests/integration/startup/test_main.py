@@ -6,7 +6,8 @@ import discord
 import pytest
 
 from maciota_bot.agent import Agent
-from maciota_bot.events import on_member_join, on_message, on_ready
+from maciota_bot.client import MaciotaClient
+from maciota_bot.client.events import on_member_join, on_message
 from maciota_bot.main import main
 from maciota_bot.services.welcome import WELCOME_TEMPLATES
 from maciota_bot.state import get_state
@@ -80,12 +81,11 @@ async def test_main_logs_in_with_the_token_and_publishes_the_agent(
         assert captured['token'] == 'test-token'
         assert captured['log_handler'] is None
         client = captured['client']
-        assert isinstance(client, discord.Client)
+        assert isinstance(client, MaciotaClient)
         assert get_state().engine is not None
         assert get_state().tree is client.tree
         assert get_state().client is client
         assert get_state().agent is None
-        assert client.on_ready is on_ready
         assert client.on_message is on_message
         assert client.on_member_join is on_member_join
     finally:
@@ -121,7 +121,7 @@ async def test_main_sends_a_welcome_when_a_member_joins(
         main()
 
         client = captured['client']
-        assert isinstance(client, discord.Client)
+        assert isinstance(client, MaciotaClient)
         await client.on_ready()
         assert isinstance(get_state().agent, Agent)
         assert (tmp_path / 'maciota.db').is_file()
@@ -167,13 +167,13 @@ async def test_main_syncs_the_welcome_command_when_ready(
     monkeypatch.setattr(discord.Client, 'run', run)
     monkeypatch.setattr(discord.app_commands.CommandTree, 'sync', sync)
     handler = record_bot_connected(order)
-    events_logger = logging.getLogger('maciota_bot.events')
+    client_logger = logging.getLogger('maciota_bot.client.bot')
     try:
         main()
 
         client = captured['client']
-        assert isinstance(client, discord.Client)
-        events_logger.addHandler(handler)
+        assert isinstance(client, MaciotaClient)
+        client_logger.addHandler(handler)
         await client.on_ready()
         assert isinstance(get_state().agent, Agent)
         assert order == ['sync', 'log']
@@ -185,6 +185,6 @@ async def test_main_syncs_the_welcome_command_when_ready(
         assert command.default_permissions.administrator is True
         assert command.get_parameter('canal') is not None
     finally:
-        events_logger.removeHandler(handler)
+        client_logger.removeHandler(handler)
         await release_engine()
         _restore('maciota_bot', 'discord', 'discord.http')

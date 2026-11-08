@@ -1,3 +1,4 @@
+import logging
 import random
 
 import discord
@@ -5,6 +6,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from maciota_bot.db import get_session
 from maciota_bot.models import GuildWelcomeChannel
+
+logger = logging.getLogger(__name__)
 
 WELCOME_TEMPLATES: tuple[str, ...] = (
     '{user_name} entrou. Esconde o controle antes que peça.',
@@ -82,6 +85,35 @@ async def define_welcome_channel(
         interaction,
         f'Canal de boas-vindas definido para {canal.mention}.',
     )
+
+
+async def greet(member: discord.Member) -> None:
+    if member.bot:
+        return
+
+    channel = await _configured_channel(member)
+    if channel is None:
+        channel = member.guild.system_channel
+    if channel is None:
+        logger.warning('Canal de sistema ausente')
+        return
+
+    message = build_welcome_message(member.mention)
+    await channel.send(message)
+
+
+async def _configured_channel(
+    member: discord.Member,
+) -> discord.abc.Messageable | None:
+    channel_id = await get_welcome_channel_id(member.guild.id)
+    if channel_id is None:
+        return None
+
+    channel = member.guild.get_channel(channel_id)
+    if channel is None:
+        logger.warning('Canal de boas-vindas ausente')
+        return None
+    return channel
 
 
 async def _reply(interaction: discord.Interaction, content: str) -> None:

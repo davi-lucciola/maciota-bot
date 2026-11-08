@@ -1,5 +1,5 @@
 from maciota_bot.agent.schema import AgentInput, AgentOutput
-from maciota_bot.events import on_message
+from maciota_bot.services.conversation import respond
 from maciota_bot.state import configure, get_state
 from tests.support import make_state
 
@@ -90,7 +90,7 @@ async def test_bot_author_receives_no_reply() -> None:
     _publish(agent)
     message = _Message('!ping', bot=True)
 
-    await on_message(message)
+    await respond(message)
 
     assert message.channel.sent == []
     assert agent.calls == []
@@ -101,7 +101,7 @@ async def test_direct_message_receives_no_reply() -> None:
     _publish(agent)
     message = _Message('oi', direct=True)
 
-    await on_message(message)
+    await respond(message)
 
     assert message.channel.sent == []
     assert agent.calls == []
@@ -112,7 +112,7 @@ async def test_mention_replies_to_the_message() -> None:
     _publish(agent)
     message = _Message('e ai', mentioned=True)
 
-    await on_message(message)
+    await respond(message)
 
     assert message.channel.sent == ['cheguei']
     assert message.channel.references[0].message_id == 99
@@ -124,7 +124,7 @@ async def test_ordinary_text_is_a_channel_message() -> None:
     _publish(agent)
     message = _Message('!ping')
 
-    await on_message(message)
+    await respond(message)
 
     assert agent.calls == [_turn(trigger_type='proactive', content='!ping')]
     assert message.channel.sent == ['kkk']
@@ -136,7 +136,7 @@ async def test_empty_response_sends_nothing() -> None:
     _publish(agent)
     message = _Message('hello')
 
-    await on_message(message)
+    await respond(message)
 
     assert message.channel.sent == []
 
@@ -146,6 +146,6 @@ async def test_agent_failure_sends_nothing() -> None:
     _publish(agent)
     message = _Message('hello')
 
-    await on_message(message)
+    await respond(message)
 
     assert message.channel.sent == []

@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from maciota_bot.events import on_member_join
+from maciota_bot.services.welcome import greet
 
 
 class _Channel:
@@ -52,7 +52,7 @@ def _saved_channel(
     async def read(guild_id: int) -> int | None:
         return channel_id
 
-    monkeypatch.setattr('maciota_bot.events.get_welcome_channel_id', read)
+    monkeypatch.setattr('maciota_bot.services.welcome.get_welcome_channel_id', read)
 
 
 async def test_bot_member_sends_nothing(
@@ -64,12 +64,18 @@ async def test_bot_member_sends_nothing(
     async def fail_read(guild_id: int) -> int | None:
         raise AssertionError(guild_id)
 
-    monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail_message)
-    monkeypatch.setattr('maciota_bot.events.get_welcome_channel_id', fail_read)
+    monkeypatch.setattr(
+        'maciota_bot.services.welcome.build_welcome_message',
+        fail_message,
+    )
+    monkeypatch.setattr(
+        'maciota_bot.services.welcome.get_welcome_channel_id',
+        fail_read,
+    )
     channel = _Channel()
     member = _Member('<@42>', bot=True, channel=channel)
 
-    await on_member_join(member)
+    await greet(member)
 
     assert channel.sent == []
 
@@ -83,12 +89,12 @@ async def test_member_join_sends_the_service_message(
         seen['user_name'] = user_name
         return 'oi ada'
 
-    monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
+    monkeypatch.setattr('maciota_bot.services.welcome.build_welcome_message', build)
     _saved_channel(monkeypatch, None)
     channel = _Channel()
     member = _Member('<@42>', bot=False, channel=channel)
 
-    await on_member_join(member)
+    await greet(member)
 
     assert seen['user_name'] == '<@42>'
     assert channel.sent == ['oi ada']
@@ -100,12 +106,12 @@ async def test_no_saved_channel_uses_system_channel(
     def build(user_name: str) -> str:
         return 'oi ada'
 
-    monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
+    monkeypatch.setattr('maciota_bot.services.welcome.build_welcome_message', build)
     _saved_channel(monkeypatch, None)
     channel = _Channel()
     member = _Member('<@42>', bot=False, channel=channel, guild_id=5)
 
-    await on_member_join(member)
+    await greet(member)
 
     assert channel.sent == ['oi ada']
 
@@ -116,7 +122,7 @@ async def test_saved_channel_receives_the_welcome(
     def build(user_name: str) -> str:
         return 'oi ada'
 
-    monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
+    monkeypatch.setattr('maciota_bot.services.welcome.build_welcome_message', build)
     _saved_channel(monkeypatch, 99)
     system = _Channel()
     welcome = _Channel()
@@ -128,7 +134,7 @@ async def test_saved_channel_receives_the_welcome(
         channels={99: welcome},
     )
 
-    await on_member_join(member)
+    await greet(member)
 
     assert welcome.sent == ['oi ada']
     assert system.sent == []
@@ -141,13 +147,13 @@ async def test_missing_saved_channel_falls_back_to_system_channel(
     def build(user_name: str) -> str:
         return 'oi ada'
 
-    monkeypatch.setattr('maciota_bot.events.build_welcome_message', build)
+    monkeypatch.setattr('maciota_bot.services.welcome.build_welcome_message', build)
     _saved_channel(monkeypatch, 99)
-    caplog.set_level(logging.WARNING, logger='maciota_bot.events')
+    caplog.set_level(logging.WARNING, logger='maciota_bot.services.welcome')
     system = _Channel()
     member = _Member('<@42>', bot=False, channel=system, guild_id=5, channels={})
 
-    await on_member_join(member)
+    await greet(member)
 
     assert caplog.messages == ['Canal de boas-vindas ausente']
     assert system.sent == ['oi ada']
@@ -160,12 +166,12 @@ async def test_missing_saved_and_system_channels_log_and_send_nothing(
     def fail(user_name: str) -> str:
         raise AssertionError(user_name)
 
-    monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail)
+    monkeypatch.setattr('maciota_bot.services.welcome.build_welcome_message', fail)
     _saved_channel(monkeypatch, 99)
-    caplog.set_level(logging.WARNING, logger='maciota_bot.events')
+    caplog.set_level(logging.WARNING, logger='maciota_bot.services.welcome')
     member = _Member('<@42>', bot=False, channel=None, guild_id=5, channels={})
 
-    await on_member_join(member)
+    await greet(member)
 
     assert caplog.messages == [
         'Canal de boas-vindas ausente',
@@ -180,11 +186,11 @@ async def test_missing_system_channel_logs_and_sends_nothing(
     def fail(user_name: str) -> str:
         raise AssertionError(user_name)
 
-    monkeypatch.setattr('maciota_bot.events.build_welcome_message', fail)
+    monkeypatch.setattr('maciota_bot.services.welcome.build_welcome_message', fail)
     _saved_channel(monkeypatch, None)
-    caplog.set_level(logging.WARNING, logger='maciota_bot.events')
+    caplog.set_level(logging.WARNING, logger='maciota_bot.services.welcome')
     member = _Member('<@42>', bot=False, channel=None)
 
-    await on_member_join(member)
+    await greet(member)
 
     assert caplog.messages == ['Canal de sistema ausente']

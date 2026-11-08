@@ -125,8 +125,8 @@ def make_nodes(
                 f'Esperado StyleDecision da LLM, recebido {type(decision).__name__}'
             )
 
-        logger.debug('Estilo escolhido: %s', decision.style)
-        return {'persona_style': decision.style}
+        logger.debug('Estilo escolhido: %s', decision.style.value)
+        return {'persona_style': decision.style.value}
 
     async def generate_response(state: BotState) -> dict[str, object]:
         reply = await reply_model.ainvoke(model_input(state, reply_prompt(state)))

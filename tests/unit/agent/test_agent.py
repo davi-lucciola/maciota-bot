@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 import aiosqlite
+import langgraph.checkpoint.serde.jsonplus as checkpoint_serde
 import pytest
 from langchain.messages import AIMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -287,7 +288,11 @@ async def test_model_sees_only_the_last_thirty_messages() -> None:
     assert len(_conversation(light.seen[-1])) == 30
 
 
-async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
+async def test_sqlite_thread_is_per_channel(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING, logger='langgraph.checkpoint.serde.jsonplus')
     light = ScriptedModel([_style('ironia curta')])
     reply = ScriptedModel(['ok'])
     connection = await aiosqlite.connect(tmp_path / 'checkpoints.db')
@@ -296,7 +301,10 @@ async def test_sqlite_thread_is_per_channel(tmp_path: Path) -> None:
     agent = BotAgent(light_model=light, reply_model=reply, checkpointer=saver)
     try:
         await _say(agent, 'segredo', channel_id=1, message_id=1)
+        caplog.clear()
+        checkpoint_serde._warned_unregistered_types.clear()
         await _say(agent, 'de novo', channel_id=1, message_id=2)
+        assert 'PersonaStyle' not in caplog.text
         assert 'Ada: segredo' in _conversation(reply.seen[-1])
 
         await _say(agent, 'outro', channel_id=2, message_id=3)

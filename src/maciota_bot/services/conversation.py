@@ -53,6 +53,7 @@ def _turn(
         message_id=message.id,
         author_name=message.author.display_name,
         content=message.content,
+        created_at=message.created_at,
         trigger_type=trigger_type,
         guild_name=guild.name,
         guild_description=guild.description,

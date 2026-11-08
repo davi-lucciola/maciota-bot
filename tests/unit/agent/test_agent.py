@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 import aiosqlite
@@ -71,6 +72,9 @@ class _LooseModel(ScriptedModel):
         return _Loose(self)
 
 
+_SENT_AT = datetime(2026, 11, 8, 15, 23, tzinfo=UTC)
+
+
 def _style(style: str) -> StyleDecision:
     return StyleDecision(reasoning='tom', style=style)
 
@@ -100,6 +104,7 @@ async def _say(
             message_id=message_id,
             author_name='Ada',
             content=content,
+            created_at=_SENT_AT,
             trigger_type=trigger_type,
             guild_name=guild_name,
             channel_name=channel_name,
@@ -138,6 +143,7 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
     assert 'Resposta gerada: kkkkk intankavel' in caplog.text
     assert text.reply_to_message_id == 1
     assert len(light.seen) == 1
+    assert _conversation(reply.seen[0]) == ['Ada (12:23): e ai']
     assert 'Decida se o Maciota entra' not in _system(light.seen[0])
     assert 'Estilo desta resposta: ironia curta.' in system
     assert 'rir' in system
@@ -245,7 +251,18 @@ async def test_proactive_reply_uses_the_message_id(
 
     assert text.text == 'de novo'
     assert text.reply_to_message_id == 10
-    assert 'Maciota (você)' in _system(light.seen[1])
+    trigger = light.seen[1]
+    system = _system(trigger)
+    assert 'Decida se o Maciota entra' in system
+    assert 'O padrão é ficar quieto' in system
+    assert 'Ada (12:23)' not in system
+    assert 'sumiu mesmo' not in system
+    assert 'Maciota (você)' not in system
+    assert _conversation(trigger) == [
+        'Ada (12:23): cadê o controle',
+        'sumiu mesmo',
+        'Ada (12:23): alguém viu?',
+    ]
     assert 'Você está respondendo a mensagem de Ada.' in _system(reply.seen[-1])
     assert (
         'Decisão: reply, enviar. gancho=o controle sumiu reply_to=10. '
@@ -283,8 +300,8 @@ async def test_model_sees_only_the_last_thirty_messages() -> None:
 
     conversation = _conversation(reply.seen[-1])
     assert len(conversation) == 30
-    assert 'Ada: msg-0' not in conversation
-    assert 'Ada: msg-15' in conversation
+    assert 'Ada (12:23): msg-0' not in conversation
+    assert 'Ada (12:23): msg-15' in conversation
     assert len(_conversation(light.seen[-1])) == 30
 
 
@@ -305,12 +322,12 @@ async def test_sqlite_thread_is_per_channel(
         checkpoint_serde._warned_unregistered_types.clear()
         await _say(agent, 'de novo', channel_id=1, message_id=2)
         assert 'PersonaStyle' not in caplog.text
-        assert 'Ada: segredo' in _conversation(reply.seen[-1])
+        assert 'Ada (12:23): segredo' in _conversation(reply.seen[-1])
 
         await _say(agent, 'outro', channel_id=2, message_id=3)
         conversation = _conversation(reply.seen[-1])
-        assert 'Ada: segredo' not in conversation
-        assert 'Ada: outro' in conversation
+        assert 'Ada (12:23): segredo' not in conversation
+        assert 'Ada (12:23): outro' in conversation
     finally:
         await agent.aclose()
 
@@ -365,9 +382,9 @@ async def test_same_channel_turns_do_not_overlap() -> None:
     assert (await second).text == 'segundo'
     assert second_entered.is_set()
     assert _conversation(reply.seen[-1]) == [
-        'Ada: um',
+        'Ada (12:23): um',
         'primeiro',
-        'Ada: dois',
+        'Ada (12:23): dois',
     ]
 
 

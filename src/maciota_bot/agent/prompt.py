@@ -8,6 +8,7 @@ from maciota_bot.agent.schema import Acidity
 from maciota_bot.agent.state import MESSAGE_WINDOW, BotState
 
 _SLOT = re.compile(r'\{\{([a-z0-9_]+)\}\}')
+_CLOCK = re.compile(r' \(\d{2}:\d{2}\)$')
 _PROMPTS = files('maciota_bot.agent').joinpath('prompts')
 
 
@@ -55,19 +56,8 @@ def server_context(state: BotState) -> str:
     )
 
 
-def trigger_instruction(state: BotState) -> str:
-    numbered = '\n'.join(
-        _numbered_turn(index, message)
-        for index, message in enumerate(recent_messages(state))
-    )
-    return render('trigger', mensagens=numbered)
-
-
-def _numbered_turn(index: int, message: object) -> str:
-    if isinstance(message, HumanMessage):
-        return f'{index}. {message.content}'
-    content = getattr(message, 'content', '')
-    return f'{index}. Maciota (você): {content}'
+def trigger_instruction(_state: BotState) -> str:
+    return render('trigger')
 
 
 def reply_prompt(state: BotState) -> str:
@@ -100,5 +90,6 @@ def _author_of(state: BotState, message_id: int) -> str:
             continue
         if int(message.id) != message_id:
             continue
-        return str(message.content).split(':', 1)[0]
+        head = str(message.content).split(': ', 1)[0]
+        return _CLOCK.sub('', head)
     return 'essa pessoa'

@@ -1,6 +1,7 @@
 import logging
 from datetime import UTC, datetime
 
+import discord
 import pytest
 
 from maciota_bot.agent.schema import AgentOutput, BotInput
@@ -39,6 +40,23 @@ class _Channel:
         self.references.append(reference)
 
 
+class _Referenced:
+    def __init__(self, content: str, author: str = 'Davi Lucciola') -> None:
+        self.content = content
+        self.author = _Author(bot=False, name=author)
+
+
+class _Reference:
+    def __init__(self, message_id: int, resolved: object | None) -> None:
+        self.message_id = message_id
+        self.resolved = resolved
+
+
+class _HttpResponse:
+    status = 404
+    reason = 'Not Found'
+
+
 class _Message:
     def __init__(
         self,
@@ -47,6 +65,7 @@ class _Message:
         bot: bool = False,
         mentioned: bool = False,
         direct: bool = False,
+        reference: _Reference | None = None,
     ) -> None:
         self.content = content
         self.id = 99
@@ -55,6 +74,7 @@ class _Message:
         self.created_at = _SENT_AT
         self.channel = _Channel()
         self.guild = None if direct else _Guild()
+        self.reference = reference
 
 
 class _Agent:
@@ -186,3 +206,50 @@ async def test_saved_acidity_reaches_the_turn() -> None:
     await respond(message)
 
     assert agent.calls[0].acidity == 'sharp'
+
+
+async def test_resolved_reply_reaches_the_turn() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    message = _Message(
+        'responde ele',
+        reference=_Reference(50, _Referenced('Eu posso te desligar ein')),
+    )
+
+    await respond(message)
+
+    assert agent.calls[0].referenced_author == 'Davi Lucciola'
+    assert agent.calls[0].referenced_excerpt == 'Eu posso te desligar ein'
+
+
+async def test_unresolved_reply_is_fetched() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    message = _Message('responde ele', reference=_Reference(50, None))
+
+    async def fetch_message(message_id: int) -> _Referenced:
+        assert message_id == 50
+        return _Referenced('Eu posso te desligar ein')
+
+    message.channel.fetch_message = fetch_message
+
+    await respond(message)
+
+    assert agent.calls[0].referenced_author == 'Davi Lucciola'
+    assert agent.calls[0].referenced_excerpt == 'Eu posso te desligar ein'
+
+
+async def test_failed_reply_fetch_leaves_the_turn_unmarked() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    message = _Message('responde ele', reference=_Reference(50, None))
+
+    async def fetch_message(message_id: int) -> None:
+        raise discord.HTTPException(_HttpResponse(), 'missing')
+
+    message.channel.fetch_message = fetch_message
+
+    await respond(message)
+
+    assert agent.calls[0].referenced_author is None
+    assert agent.calls[0].referenced_excerpt is None

@@ -1,5 +1,6 @@
 from typing import Annotated
 
+from langchain.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
@@ -7,7 +8,7 @@ MESSAGE_WINDOW = 30
 
 
 class BotState(TypedDict):
-    messages: Annotated[list, add_messages]
+    messages: Annotated[list[AnyMessage], add_messages]
     channel_id: int
     message_id: int
     author_name: str

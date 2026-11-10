@@ -2,7 +2,7 @@ import re
 from functools import cache
 from importlib.resources import files
 
-from langchain.messages import HumanMessage
+from langchain.messages import AnyMessage, HumanMessage
 
 from maciota_bot.agent.schema import Acidity
 from maciota_bot.agent.state import MESSAGE_WINDOW, BotState
@@ -10,6 +10,7 @@ from maciota_bot.agent.state import MESSAGE_WINDOW, BotState
 _SLOT = re.compile(r'\{\{([a-z0-9_]+)\}\}')
 _CLOCK = re.compile(r' \(\d{2}:\d{2}\)$')
 _PROMPTS = files('maciota_bot.agent').joinpath('prompts')
+_EXCERPT_LIMIT = 80
 
 
 @cache
@@ -77,19 +78,40 @@ def reply_audience(state: BotState) -> str:
     target = state['reply_to_message_id']
     if target is None:
         return render('audience_channel')
-    return render('audience_reply', autor=_author_of(state, target))
+    return render('audience_reply', autor=author_of(state, target))
 
 
-def recent_messages(state: BotState) -> list:
+def recent_messages(state: BotState) -> list[AnyMessage]:
     return list(state['messages'])[-MESSAGE_WINDOW:]
 
 
-def _author_of(state: BotState, message_id: int) -> str:
+def clip_excerpt(text: str) -> str:
+    return ' '.join(text.split())[:_EXCERPT_LIMIT]
+
+
+def author_of(state: BotState, message_id: int) -> str:
+    message = _human(state, message_id)
+    if message is None:
+        return 'essa pessoa'
+    if message.name:
+        return message.name
+    head = str(message.content).split(': ', 1)[0]
+    return _CLOCK.sub('', head)
+
+
+def line_excerpt(state: BotState, message_id: int) -> str | None:
+    message = _human(state, message_id)
+    if message is None:
+        return None
+    excerpt = clip_excerpt(str(message.content))
+    return excerpt or None
+
+
+def _human(state: BotState, message_id: int) -> HumanMessage | None:
     for message in recent_messages(state):
         if not isinstance(message, HumanMessage) or message.id is None:
             continue
         if int(message.id) != message_id:
             continue
-        head = str(message.content).split(': ', 1)[0]
-        return _CLOCK.sub('', head)
-    return 'essa pessoa'
+        return message
+    return None

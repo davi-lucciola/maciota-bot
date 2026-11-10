@@ -8,6 +8,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from maciota_bot.agent.graph import BotGraph, build_graph
 from maciota_bot.agent.llm import get_chat_model
 from maciota_bot.agent.schema import AgentOutput, BotInput
+from maciota_bot.agent.state import BotState
 from maciota_bot.config import settings
 
 
@@ -33,16 +34,14 @@ class BotAgent:
 
     async def execute(self, turn: BotInput) -> AgentOutput:
         async with self._lock_for(turn.channel_id):
-            result = await self._graph.ainvoke(
+            result: BotState = await self._graph.ainvoke(
                 turn,
                 {'configurable': {'thread_id': f'channel_{turn.channel_id}'}},
             )
 
-        reply_to = result.get('reply_to_message_id')
-
         return AgentOutput(
-            text=result.get('final_response') or '',
-            reply_to_message_id=reply_to if isinstance(reply_to, int) else None,
+            text=result['final_response'],
+            reply_to_message_id=result['reply_to_message_id'],
         )
 
     def _lock_for(self, channel_id: int) -> asyncio.Lock:

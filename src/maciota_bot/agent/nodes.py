@@ -1,13 +1,16 @@
 import logging
-from datetime import datetime
+import re
 from zoneinfo import ZoneInfo
 
 from langchain.chat_models import BaseChatModel
-from langchain.messages import AIMessage, HumanMessage, SystemMessage
+from langchain.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from pydantic import Field
 
 from maciota_bot.agent.prompt import (
     PERSONA_PROMPT,
+    author_of,
+    clip_excerpt,
+    line_excerpt,
     recent_messages,
     reply_prompt,
     server_context,
@@ -23,16 +26,66 @@ from maciota_bot.agent.state import BotState
 
 logger = logging.getLogger(__name__)
 _SAO_PAULO = ZoneInfo('America/Sao_Paulo')
+_UNSAFE_NAME = re.compile(r'[^A-Za-z0-9_-]+')
+_NAME_LIMIT = 64
+_BOT_NAME = 'Maciota'
 
 
-def _user_line(author_name: str, created_at: datetime, content: str) -> str:
-    clock = created_at.astimezone(_SAO_PAULO).strftime('%H:%M')
-    return f'{author_name} ({clock}): {content}'
+def message_name(display_name: str) -> str:
+    slug = _UNSAFE_NAME.sub('_', display_name).strip('_')[:_NAME_LIMIT]
+    return slug or 'usuario'
 
 
-def model_input(state: BotState, instruction: str) -> list:
+def model_input(state: BotState, instruction: str) -> list[AnyMessage]:
     system = f'{server_context(state)}\n\n{instruction}'
-    return [SystemMessage(content=system), *recent_messages(state)]
+    return [SystemMessage(content=system), *_numbered(recent_messages(state))]
+
+
+def _numbered(messages: list[AnyMessage]) -> list[AnyMessage]:
+    numbered = []
+    for index, message in enumerate(messages):
+        content = message.content
+        if not isinstance(content, str):
+            content = str(content)
+        numbered.append(message.model_copy(update={'content': f'[{index}] {content}'}))
+    return numbered
+
+
+def _user_content(turn: BotInput) -> str:
+    clock = turn.created_at.astimezone(_SAO_PAULO).strftime('%H:%M')
+    mark = _reply_mark(
+        _referenced_name(turn.referenced_author),
+        turn.referenced_excerpt,
+    )
+    body = f'{mark}: {turn.content}' if mark else turn.content
+    return f'({clock}) {body}'
+
+
+def _referenced_name(author: str | None) -> str | None:
+    if author is None or not author.strip():
+        return None
+    return message_name(author)
+
+
+def _reply_mark(author: str | None, excerpt: str | None) -> str:
+    quote = clip_excerpt(excerpt) if excerpt else ''
+    if author and quote:
+        return f'respondendo a {author} ("{quote}")'
+    if author:
+        return f'respondendo a {author}'
+    if quote:
+        return f'respondendo ("{quote}")'
+    return ''
+
+
+def _assistant_content(state: BotState, text: str) -> str:
+    target = state['reply_to_message_id']
+    if not isinstance(target, int):
+        return text
+    mark = _reply_mark(author_of(state, target), line_excerpt(state, target))
+    if not mark:
+        return text
+    return f'{mark}: {text}'
 
 
 def message_id_at(state: BotState, index: int | None) -> int | None:
@@ -48,12 +101,13 @@ def message_id_at(state: BotState, index: int | None) -> int | None:
 
 
 class _TriggerInput(BotInput):
-    messages: list = Field(default_factory=list)
+    messages: list[AnyMessage] = Field(default_factory=list)
 
 
 def turn_state(turn: _TriggerInput) -> BotState:
     incoming = HumanMessage(
-        content=_user_line(turn.author_name, turn.created_at, turn.content),
+        content=_user_content(turn),
+        name=message_name(turn.author_name),
         id=str(turn.message_id),
     )
     return {
@@ -92,14 +146,9 @@ def make_nodes(
             return state
 
         structured = light_model.with_structured_output(TriggerDecision)
-        decision = await structured.ainvoke(
+        decision: TriggerDecision = await structured.ainvoke(
             model_input(state, trigger_instruction(state))
         )
-
-        if not isinstance(decision, TriggerDecision):
-            raise TypeError(
-                f'Esperado TriggerDecision da LLM, recebido {type(decision).__name__}'
-            )
 
         if decision.action == TriggerAction.SILENCE:
             logger.debug('Decisão: silence, não enviar. %s', decision.reasoning)
@@ -126,23 +175,24 @@ def make_nodes(
 
     async def persona_router(state: BotState) -> dict[str, str]:
         structured = light_model.with_structured_output(StyleDecision)
-        decision = await structured.ainvoke(model_input(state, PERSONA_PROMPT))
-
-        if not isinstance(decision, StyleDecision):
-            raise TypeError(
-                f'Esperado StyleDecision da LLM, recebido {type(decision).__name__}'
-            )
+        decision: StyleDecision = await structured.ainvoke(
+            model_input(state, PERSONA_PROMPT)
+        )
 
         logger.debug('Estilo escolhido: %s', decision.style.value)
         return {'persona_style': decision.style.value}
 
     async def generate_response(state: BotState) -> dict[str, object]:
-        reply = await reply_model.ainvoke(model_input(state, reply_prompt(state)))
+        reply: AIMessage = await reply_model.ainvoke(
+            model_input(state, reply_prompt(state))
+        )
         text = _text(reply).strip()
         logger.debug('Resposta gerada: %s', text)
         return {
             'final_response': text,
-            'messages': [AIMessage(content=text)],
+            'messages': [
+                AIMessage(content=_assistant_content(state, text), name=_BOT_NAME)
+            ],
         }
 
     return evaluate_trigger, persona_router, generate_response

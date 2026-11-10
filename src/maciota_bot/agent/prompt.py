@@ -2,7 +2,7 @@ import re
 from functools import cache
 from importlib.resources import files
 
-from langchain.messages import HumanMessage
+from langchain.messages import AnyMessage, HumanMessage
 
 from maciota_bot.agent.schema import Acidity
 from maciota_bot.agent.state import MESSAGE_WINDOW, BotState
@@ -81,7 +81,7 @@ def reply_audience(state: BotState) -> str:
     return render('audience_reply', autor=author_of(state, target))
 
 
-def recent_messages(state: BotState) -> list:
+def recent_messages(state: BotState) -> list[AnyMessage]:
     return list(state['messages'])[-MESSAGE_WINDOW:]
 
 

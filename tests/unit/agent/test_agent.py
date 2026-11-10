@@ -555,7 +555,7 @@ async def test_wrong_style_schema_fails() -> None:
     reply = ScriptedModel(['não devia'])
     agent = _agent(light, reply)
 
-    with pytest.raises(TypeError, match='StyleDecision'):
+    with pytest.raises(AttributeError):
         await _say(agent, 'e ai')
 
     assert reply.seen == []

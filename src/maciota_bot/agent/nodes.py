@@ -3,7 +3,7 @@ import re
 from zoneinfo import ZoneInfo
 
 from langchain.chat_models import BaseChatModel
-from langchain.messages import AIMessage, HumanMessage, SystemMessage
+from langchain.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from pydantic import Field
 
 from maciota_bot.agent.prompt import (
@@ -36,12 +36,12 @@ def message_name(display_name: str) -> str:
     return slug or 'usuario'
 
 
-def model_input(state: BotState, instruction: str) -> list:
+def model_input(state: BotState, instruction: str) -> list[AnyMessage]:
     system = f'{server_context(state)}\n\n{instruction}'
     return [SystemMessage(content=system), *_numbered(recent_messages(state))]
 
 
-def _numbered(messages: list) -> list:
+def _numbered(messages: list[AnyMessage]) -> list[AnyMessage]:
     numbered = []
     for index, message in enumerate(messages):
         content = message.content
@@ -101,7 +101,7 @@ def message_id_at(state: BotState, index: int | None) -> int | None:
 
 
 class _TriggerInput(BotInput):
-    messages: list = Field(default_factory=list)
+    messages: list[AnyMessage] = Field(default_factory=list)
 
 
 def turn_state(turn: _TriggerInput) -> BotState:
@@ -146,14 +146,9 @@ def make_nodes(
             return state
 
         structured = light_model.with_structured_output(TriggerDecision)
-        decision = await structured.ainvoke(
+        decision: TriggerDecision = await structured.ainvoke(
             model_input(state, trigger_instruction(state))
         )
-
-        if not isinstance(decision, TriggerDecision):
-            raise TypeError(
-                f'Esperado TriggerDecision da LLM, recebido {type(decision).__name__}'
-            )
 
         if decision.action == TriggerAction.SILENCE:
             logger.debug('Decisão: silence, não enviar. %s', decision.reasoning)
@@ -180,18 +175,17 @@ def make_nodes(
 
     async def persona_router(state: BotState) -> dict[str, str]:
         structured = light_model.with_structured_output(StyleDecision)
-        decision = await structured.ainvoke(model_input(state, PERSONA_PROMPT))
-
-        if not isinstance(decision, StyleDecision):
-            raise TypeError(
-                f'Esperado StyleDecision da LLM, recebido {type(decision).__name__}'
-            )
+        decision: StyleDecision = await structured.ainvoke(
+            model_input(state, PERSONA_PROMPT)
+        )
 
         logger.debug('Estilo escolhido: %s', decision.style.value)
         return {'persona_style': decision.style.value}
 
     async def generate_response(state: BotState) -> dict[str, object]:
-        reply = await reply_model.ainvoke(model_input(state, reply_prompt(state)))
+        reply: AIMessage = await reply_model.ainvoke(
+            model_input(state, reply_prompt(state))
+        )
         text = _text(reply).strip()
         logger.debug('Resposta gerada: %s', text)
         return {

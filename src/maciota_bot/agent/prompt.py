@@ -89,10 +89,16 @@ def clip_excerpt(text: str) -> str:
     return ' '.join(text.split())[:_EXCERPT_LIMIT]
 
 
+_SPEAKER = re.compile(r'^(?P<name>.+?) \(\d{2}:\d{2}\): ')
+
+
 def author_of(state: BotState, message_id: int) -> str:
     message = _human(state, message_id)
     if message is None:
         return 'essa pessoa'
+    spoken = _speaker_name(str(message.content))
+    if spoken:
+        return spoken
     if message.name:
         return message.name
     head = str(message.content).split(': ', 1)[0]
@@ -103,8 +109,18 @@ def line_excerpt(state: BotState, message_id: int) -> str | None:
     message = _human(state, message_id)
     if message is None:
         return None
-    excerpt = clip_excerpt(str(message.content))
+    content = str(message.content)
+    match = _SPEAKER.match(content)
+    text = content[match.end() :] if match else content
+    excerpt = clip_excerpt(text)
     return excerpt or None
+
+
+def _speaker_name(content: str) -> str:
+    match = _SPEAKER.match(content)
+    if match is None:
+        return ''
+    return match.group('name').strip()
 
 
 def _human(state: BotState, message_id: int) -> HumanMessage | None:

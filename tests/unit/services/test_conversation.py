@@ -20,6 +20,19 @@ class _Author:
         self.display_name = name
 
 
+class _Named:
+    def __init__(self, item_id: int, name: str) -> None:
+        self.id = item_id
+        self.name = name
+
+
+class _Mention:
+    def __init__(self, user_id: int, username: str, display_name: str) -> None:
+        self.id = user_id
+        self.name = username
+        self.display_name = display_name
+
+
 class _Guild:
     def __init__(self) -> None:
         self.id = 3
@@ -41,9 +54,15 @@ class _Channel:
 
 
 class _Referenced:
-    def __init__(self, content: str, author: str = 'Davi Lucciola') -> None:
+    def __init__(
+        self,
+        content: str,
+        author: str = 'Davi Lucciola',
+        mentions: list[_Mention] | None = None,
+    ) -> None:
         self.content = content
         self.author = _Author(bot=False, name=author)
+        self.mentions = mentions or []
 
 
 class _Reference:
@@ -66,6 +85,7 @@ class _Message:
         mentioned: bool = False,
         direct: bool = False,
         reference: _Reference | None = None,
+        mentions: list[_Mention] | None = None,
     ) -> None:
         self.content = content
         self.id = 99
@@ -75,6 +95,7 @@ class _Message:
         self.channel = _Channel()
         self.guild = None if direct else _Guild()
         self.reference = reference
+        self.mentions = mentions or []
 
 
 class _Agent:
@@ -253,3 +274,54 @@ async def test_failed_reply_fetch_leaves_the_turn_unmarked() -> None:
 
     assert agent.calls[0].referenced_author is None
     assert agent.calls[0].referenced_excerpt is None
+
+
+async def test_user_mention_becomes_the_username() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    message = _Message(
+        'Qual é meu nome <@1568031015299981423>',
+        mentions=[_Mention(1568031015299981423, 'maciota', 'Maciota Bot')],
+    )
+
+    await respond(message)
+
+    content = agent.calls[0].content
+    assert content == 'Qual é meu nome @maciota'
+    assert 'Maciota Bot' not in content
+
+
+async def test_unresolved_mention_stays() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    message = _Message('oi <@999>')
+
+    await respond(message)
+
+    assert agent.calls[0].content == 'oi <@999>'
+
+
+async def test_quoted_user_mention_becomes_the_username() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    quoted = _Referenced(
+        'fala com <@7> e <@!7>',
+        mentions=[_Mention(7, 'ada', 'Ada Lovelace')],
+    )
+    message = _Message('responde ele', reference=_Reference(50, quoted))
+
+    await respond(message)
+
+    assert agent.calls[0].referenced_excerpt == 'fala com @ada e @ada'
+
+
+async def test_role_and_channel_mentions_become_names() -> None:
+    agent = _Agent('ok')
+    await _publish(agent)
+    message = _Message('vem <@&3> no <#8>')
+    message.role_mentions = [_Named(3, 'mods')]
+    message.channel_mentions = [_Named(8, 'geral')]
+
+    await respond(message)
+
+    assert agent.calls[0].content == 'vem @mods no #geral'

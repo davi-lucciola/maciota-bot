@@ -70,8 +70,29 @@ def _quote(resolved: object) -> tuple[str | None, str | None]:
         return None, None
     return (
         author if isinstance(author, str) else None,
-        content if isinstance(content, str) else None,
+        _visible(content, resolved) if isinstance(content, str) else None,
     )
+
+
+def _visible(content: str, source: object) -> str:
+    for person in getattr(source, 'mentions', ()) or ():
+        username = getattr(person, 'name', None)
+        user_id = getattr(person, 'id', None)
+        if isinstance(username, str) and isinstance(user_id, int):
+            shown = f'@{username}'
+            content = content.replace(f'<@{user_id}>', shown)
+            content = content.replace(f'<@!{user_id}>', shown)
+    for role in getattr(source, 'role_mentions', ()) or ():
+        role_name = getattr(role, 'name', None)
+        role_id = getattr(role, 'id', None)
+        if isinstance(role_name, str) and isinstance(role_id, int):
+            content = content.replace(f'<@&{role_id}>', f'@{role_name}')
+    for channel in getattr(source, 'channel_mentions', ()) or ():
+        channel_name = getattr(channel, 'name', None)
+        channel_id = getattr(channel, 'id', None)
+        if isinstance(channel_name, str) and isinstance(channel_id, int):
+            content = content.replace(f'<#{channel_id}>', f'#{channel_name}')
+    return content
 
 
 def _turn(
@@ -88,7 +109,7 @@ def _turn(
         channel_id=channel.id,
         message_id=message.id,
         author_name=message.author.display_name,
-        content=message.content,
+        content=_visible(message.content, message),
         created_at=message.created_at,
         trigger_type=trigger_type,
         guild_name=guild.name,

@@ -53,18 +53,14 @@ def _numbered(messages: list[AnyMessage]) -> list[AnyMessage]:
 
 def _user_content(turn: BotInput) -> str:
     clock = turn.created_at.astimezone(_SAO_PAULO).strftime('%H:%M')
-    mark = _reply_mark(
-        _referenced_name(turn.referenced_author),
-        turn.referenced_excerpt,
-    )
+    author = (turn.referenced_author or '').strip()
+    mark = _reply_mark(author or None, turn.referenced_excerpt)
     body = f'{mark}: {turn.content}' if mark else turn.content
-    return f'({clock}) {body}'
+    return f'{_speaker(turn.author_name)} ({clock}): {body}'
 
 
-def _referenced_name(author: str | None) -> str | None:
-    if author is None or not author.strip():
-        return None
-    return message_name(author)
+def _speaker(name: str) -> str:
+    return name.strip() or 'usuario'
 
 
 def _reply_mark(author: str | None, excerpt: str | None) -> str:

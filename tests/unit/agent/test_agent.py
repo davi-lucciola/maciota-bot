@@ -148,7 +148,7 @@ async def test_mention_skips_the_hook_and_returns_the_reply(
     assert 'Resposta gerada: kkkkk intankavel' in caplog.text
     assert text.reply_to_message_id == 1
     assert len(light.seen) == 1
-    assert _conversation(reply.seen[0]) == ['[0] (12:23) e ai']
+    assert _conversation(reply.seen[0]) == ['[0] Ada (12:23): e ai']
     assert reply.seen[0][1].name == 'Ada'
     assert 'Decida se o Maciota entra' not in _system(light.seen[0])
     assert 'Estilo desta resposta: ironia curta.' in system
@@ -225,7 +225,7 @@ async def test_proactive_channel_message_reaches_the_reply(
     assert text.text == 'sumiu mesmo'
     assert 'respondendo a' not in text.text
     assert text.reply_to_message_id is None
-    assert _conversation(reply.seen[0]) == ['[0] (12:23) cadê o controle']
+    assert _conversation(reply.seen[0]) == ['[0] Ada (12:23): cadê o controle']
     assert reply.seen[0][1].name == 'Ada'
     assert 'o controle sumiu' in _system(reply.seen[0])
     assert 'Estilo desta resposta: zoeira direta.' in _system(reply.seen[0])
@@ -271,9 +271,9 @@ async def test_proactive_reply_uses_the_message_id(
     assert 'sumiu mesmo' not in system
     assert 'Maciota (você)' not in system
     assert _conversation(trigger) == [
-        '[0] (12:23) cadê o controle',
-        '[1] respondendo a Ada ("(12:23) cadê o controle"): sumiu mesmo',
-        '[2] (12:23) alguém viu?',
+        '[0] Ada (12:23): cadê o controle',
+        '[1] respondendo a Ada ("cadê o controle"): sumiu mesmo',
+        '[2] Ada (12:23): alguém viu?',
     ]
     assert '[0] [0]' not in '\n'.join(_conversation(trigger))
     assert [message.name for message in trigger if message.type == 'human'] == [
@@ -332,9 +332,9 @@ async def test_reply_index_two_is_the_third_message() -> None:
 
     assert text.reply_to_message_id == 12
     assert _conversation(light.seen[1]) == [
-        '[0] (12:23) primeira',
-        '[1] respondendo a Ada ("(12:23) primeira"): ok',
-        '[2] (12:23) terceira',
+        '[0] Ada (12:23): primeira',
+        '[1] respondendo a Ada ("primeira"): ok',
+        '[2] Ada (12:23): terceira',
     ]
 
 
@@ -373,7 +373,11 @@ async def test_display_name_becomes_the_message_name() -> None:
     await _say(agent, 'oi', author_name='Davi Lucciola', message_id=1)
     named = reply.seen[-1][1]
     assert named.name == 'Davi_Lucciola'
-    assert 'Davi Lucciola' not in str(named.content)
+    assert str(named.content) == '[0] Davi Lucciola (12:23): oi'
+    assert 'Você está respondendo a mensagem de Davi Lucciola.' in _system(
+        reply.seen[-1]
+    )
+    assert 'Davi_Lucciola' not in _system(reply.seen[-1])
 
     await _say(
         agent,
@@ -383,6 +387,16 @@ async def test_display_name_becomes_the_message_name() -> None:
         channel_id=2,
     )
     assert reply.seen[-1][1].name == 'usuario'
+    assert str(reply.seen[-1][1].content) == '[0] !!! (12:23): oi'
+
+    await _say(
+        agent,
+        'oi',
+        author_name='   ',
+        message_id=3,
+        channel_id=3,
+    )
+    assert str(reply.seen[-1][1].content) == '[0] usuario (12:23): oi'
 
 
 async def test_discord_reply_is_marked_on_the_user_line() -> None:
@@ -403,7 +417,7 @@ async def test_discord_reply_is_marked_on_the_user_line() -> None:
     human = reply.seen[0][1]
     assert human.name == 'Jet'
     assert _conversation(reply.seen[0]) == [
-        '[0] (12:23) respondendo a Davi_Lucciola '
+        '[0] Jet (12:23): respondendo a Davi Lucciola '
         '("Eu posso te desligar ein"): responde ele'
     ]
 
@@ -507,9 +521,9 @@ async def test_same_channel_turns_do_not_overlap() -> None:
     assert (await second).text == 'segundo'
     assert second_entered.is_set()
     assert _conversation(reply.seen[-1]) == [
-        '[0] (12:23) um',
-        '[1] respondendo a Ada ("(12:23) um"): primeiro',
-        '[2] (12:23) dois',
+        '[0] Ada (12:23): um',
+        '[1] respondendo a Ada ("um"): primeiro',
+        '[2] Ada (12:23): dois',
     ]
 
 

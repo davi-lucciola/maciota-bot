@@ -11,6 +11,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from maciota_bot.agent import BotAgent
+from maciota_bot.agent.nodes import human_message
 from maciota_bot.agent.schema import (
     Acidity,
     AgentOutput,
@@ -96,26 +97,39 @@ async def _say(
     trigger_type: str = 'mention',
     guild_name: str | None = None,
     channel_name: str | None = None,
-    acidity: Acidity = 'medium',
+    acidity: Acidity | None = 'medium',
     author_name: str = 'Ada',
     referenced_author: str | None = None,
     referenced_excerpt: str | None = None,
 ) -> AgentOutput:
-    return await agent.execute(
-        BotInput(
-            channel_id=channel_id,
-            message_id=message_id,
-            author_name=author_name,
-            content=content,
-            created_at=_SENT_AT,
-            trigger_type=trigger_type,
-            guild_name=guild_name,
-            channel_name=channel_name,
-            acidity=acidity,
-            referenced_author=referenced_author,
-            referenced_excerpt=referenced_excerpt,
-        )
-    )
+    turn: BotInput = {
+        'messages': [
+            human_message(
+                message_id=message_id,
+                author_name=author_name,
+                content=content,
+                created_at=_SENT_AT,
+                referenced_author=referenced_author,
+                referenced_excerpt=referenced_excerpt,
+            )
+        ],
+        'channel_id': channel_id,
+        'message_id': message_id,
+        'author_name': author_name,
+        'created_at': _SENT_AT,
+        'trigger_type': trigger_type,
+    }
+    if guild_name is not None:
+        turn['guild_name'] = guild_name
+    if channel_name is not None:
+        turn['channel_name'] = channel_name
+    if acidity is not None:
+        turn['acidity'] = acidity
+    if referenced_author is not None:
+        turn['referenced_author'] = referenced_author
+    if referenced_excerpt is not None:
+        turn['referenced_excerpt'] = referenced_excerpt
+    return await agent.execute(turn)
 
 
 def _system(messages: list[object]) -> str:
@@ -129,6 +143,16 @@ def _conversation(messages: list[object]) -> list[str]:
         for message in messages
         if getattr(message, 'type', None) != 'system'
     ]
+
+
+async def test_missing_acidity_uses_medium() -> None:
+    light = ScriptedModel([_style('ironia curta')])
+    reply = ScriptedModel(['ok'])
+    agent = _agent(light, reply)
+
+    await _say(agent, 'oi', acidity=None)
+
+    assert 'Tom do meio' in _system(reply.seen[-1])
 
 
 async def test_mention_skips_the_hook_and_returns_the_reply(

@@ -33,10 +33,11 @@ class BotAgent:
             await self._checkpointer.conn.close()
 
     async def execute(self, turn: BotInput) -> AgentOutput:
-        async with self._lock_for(turn.channel_id):
+        channel_id = turn['channel_id']
+        async with self._lock_for(channel_id):
             result: BotState = await self._graph.ainvoke(
                 turn,
-                {'configurable': {'thread_id': f'channel_{turn.channel_id}'}},
+                {'configurable': {'thread_id': f'channel_{channel_id}'}},
             )
 
         return AgentOutput(

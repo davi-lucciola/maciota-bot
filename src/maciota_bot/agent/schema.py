@@ -1,7 +1,8 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, NotRequired
 
+from langgraph.graph.message import MessagesState
 from pydantic import BaseModel, Field
 
 type Acidity = Literal['mild', 'medium', 'sharp']
@@ -79,20 +80,19 @@ class StyleDecision(BaseModel):
     )
 
 
-class BotInput(BaseModel):
+class BotInput(MessagesState):
     channel_id: int
     message_id: int
     author_name: str
-    content: str
     created_at: datetime
     trigger_type: Literal['mention', 'proactive']
-    guild_name: str | None = None
-    guild_description: str | None = None
-    channel_name: str | None = None
-    channel_topic: str | None = None
-    acidity: Acidity = 'medium'
-    referenced_author: str | None = None
-    referenced_excerpt: str | None = None
+    guild_name: NotRequired[str | None]
+    guild_description: NotRequired[str | None]
+    channel_name: NotRequired[str | None]
+    channel_topic: NotRequired[str | None]
+    acidity: NotRequired[Acidity]
+    referenced_author: NotRequired[str | None]
+    referenced_excerpt: NotRequired[str | None]
 
 
 class AgentOutput(BaseModel):

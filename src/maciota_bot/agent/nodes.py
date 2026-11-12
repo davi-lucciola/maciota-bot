@@ -1,10 +1,10 @@
 import logging
 import re
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from langchain.chat_models import BaseChatModel
 from langchain.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
-from pydantic import Field
 
 from maciota_bot.agent.prompt import (
     PERSONA_PROMPT,
@@ -51,12 +51,24 @@ def _numbered(messages: list[AnyMessage]) -> list[AnyMessage]:
     return numbered
 
 
-def _user_content(turn: BotInput) -> str:
-    clock = turn.created_at.astimezone(_SAO_PAULO).strftime('%H:%M')
-    author = (turn.referenced_author or '').strip()
-    mark = _reply_mark(author or None, turn.referenced_excerpt)
-    body = f'{mark}: {turn.content}' if mark else turn.content
-    return f'{_speaker(turn.author_name)} ({clock}): {body}'
+def human_message(
+    *,
+    message_id: int,
+    author_name: str,
+    content: str,
+    created_at: datetime,
+    referenced_author: str | None = None,
+    referenced_excerpt: str | None = None,
+) -> HumanMessage:
+    clock = created_at.astimezone(_SAO_PAULO).strftime('%H:%M')
+    author = (referenced_author or '').strip()
+    mark = _reply_mark(author or None, referenced_excerpt)
+    body = f'{mark}: {content}' if mark else content
+    return HumanMessage(
+        content=f'{_speaker(author_name)} ({clock}): {body}',
+        name=message_name(author_name),
+        id=str(message_id),
+    )
 
 
 def _speaker(name: str) -> str:
@@ -96,27 +108,18 @@ def message_id_at(state: BotState, index: int | None) -> int | None:
     return int(message.id)
 
 
-class _TriggerInput(BotInput):
-    messages: list[AnyMessage] = Field(default_factory=list)
-
-
-def turn_state(turn: _TriggerInput) -> BotState:
-    incoming = HumanMessage(
-        content=_user_content(turn),
-        name=message_name(turn.author_name),
-        id=str(turn.message_id),
-    )
+def turn_state(turn: BotInput) -> BotState:
     return {
-        'messages': [*turn.messages, incoming],
-        'channel_id': turn.channel_id,
-        'message_id': turn.message_id,
-        'author_name': turn.author_name,
-        'trigger_type': turn.trigger_type,
-        'guild_name': turn.guild_name,
-        'guild_description': turn.guild_description,
-        'channel_name': turn.channel_name,
-        'channel_topic': turn.channel_topic,
-        'acidity': turn.acidity,
+        'messages': list(turn['messages']),
+        'channel_id': turn['channel_id'],
+        'message_id': turn['message_id'],
+        'author_name': turn['author_name'],
+        'trigger_type': turn['trigger_type'],
+        'guild_name': turn.get('guild_name'),
+        'guild_description': turn.get('guild_description'),
+        'channel_name': turn.get('channel_name'),
+        'channel_topic': turn.get('channel_topic'),
+        'acidity': turn.get('acidity', 'medium'),
         'context_hook': '',
         'persona_style': '',
         'final_response': '',
@@ -129,16 +132,16 @@ def make_nodes(
     light_model: BaseChatModel,
     reply_model: BaseChatModel,
 ) -> tuple:
-    async def evaluate_trigger(turn: _TriggerInput) -> BotState:
+    async def evaluate_trigger(turn: BotInput) -> BotState:
         state = turn_state(turn)
-        if turn.trigger_type == 'mention':
+        if turn['trigger_type'] == 'mention':
             logger.debug(
                 'Decisão: mention, enviar resposta à mensagem %s',
-                turn.message_id,
+                turn['message_id'],
             )
             state['approved'] = True
             state['context_hook'] = ''
-            state['reply_to_message_id'] = turn.message_id
+            state['reply_to_message_id'] = turn['message_id']
             return state
 
         structured = light_model.with_structured_output(TriggerDecision)

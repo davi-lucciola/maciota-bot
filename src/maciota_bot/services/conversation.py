@@ -3,6 +3,7 @@ from typing import Literal
 
 import discord
 
+from maciota_bot.agent.nodes import human_message
 from maciota_bot.agent.schema import Acidity, AgentOutput, BotInput
 from maciota_bot.services.acidity import get_acidity
 from maciota_bot.state import get_state
@@ -105,21 +106,31 @@ def _turn(
     channel = message.channel
     guild = message.guild
     assert guild is not None
-    return BotInput(
-        channel_id=channel.id,
-        message_id=message.id,
-        author_name=message.author.display_name,
-        content=_visible(message.content, message),
-        created_at=message.created_at,
-        trigger_type=trigger_type,
-        guild_name=guild.name,
-        guild_description=guild.description,
-        channel_name=getattr(channel, 'name', None),
-        channel_topic=getattr(channel, 'topic', None),
-        acidity=acidity,
-        referenced_author=referenced_author,
-        referenced_excerpt=referenced_excerpt,
-    )
+    visible = _visible(message.content, message)
+    return {
+        'messages': [
+            human_message(
+                message_id=message.id,
+                author_name=message.author.display_name,
+                content=visible,
+                created_at=message.created_at,
+                referenced_author=referenced_author,
+                referenced_excerpt=referenced_excerpt,
+            )
+        ],
+        'channel_id': channel.id,
+        'message_id': message.id,
+        'author_name': message.author.display_name,
+        'created_at': message.created_at,
+        'trigger_type': trigger_type,
+        'guild_name': guild.name,
+        'guild_description': guild.description,
+        'channel_name': getattr(channel, 'name', None),
+        'channel_topic': getattr(channel, 'topic', None),
+        'acidity': acidity,
+        'referenced_author': referenced_author,
+        'referenced_excerpt': referenced_excerpt,
+    }
 
 
 async def _send_output(message: discord.Message, output: AgentOutput) -> None:

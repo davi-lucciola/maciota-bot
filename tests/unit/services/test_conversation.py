@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 import discord
 import pytest
+from langchain.messages import HumanMessage
 
 from maciota_bot.agent.schema import AgentOutput, BotInput
 from maciota_bot.db import init_db
@@ -124,18 +125,27 @@ async def _publish(agent: _Agent) -> None:
 
 
 def _turn(*, trigger_type: str, content: str) -> BotInput:
-    return BotInput(
-        channel_id=7,
-        message_id=99,
-        author_name='Ada',
-        content=content,
-        created_at=_SENT_AT,
-        trigger_type=trigger_type,
-        guild_name='Servidor',
-        guild_description='um lugar',
-        channel_name='geral',
-        channel_topic='assunto',
-    )
+    return {
+        'messages': [
+            HumanMessage(
+                content=f'Ada (12:23): {content}',
+                name='Ada',
+                id='99',
+            )
+        ],
+        'channel_id': 7,
+        'message_id': 99,
+        'author_name': 'Ada',
+        'created_at': _SENT_AT,
+        'trigger_type': trigger_type,
+        'guild_name': 'Servidor',
+        'guild_description': 'um lugar',
+        'channel_name': 'geral',
+        'channel_topic': 'assunto',
+        'acidity': 'medium',
+        'referenced_author': None,
+        'referenced_excerpt': None,
+    }
 
 
 async def test_bot_author_receives_no_reply() -> None:
@@ -173,7 +183,8 @@ async def test_mention_replies_to_the_message(
     assert message.channel.sent == ['cheguei']
     assert message.channel.references[0].message_id == 99
     assert agent.calls == [_turn(trigger_type='mention', content='e ai')]
-    assert agent.calls[0].acidity == 'medium'
+    assert 'content' not in agent.calls[0]
+    assert agent.calls[0]['acidity'] == 'medium'
     assert 'Mensagem recebida no servidor Servidor de Ada: e ai' in caplog.text
     assert 'Decisão: enviar resposta à mensagem 99' in caplog.text
 
@@ -226,7 +237,7 @@ async def test_saved_acidity_reaches_the_turn() -> None:
 
     await respond(message)
 
-    assert agent.calls[0].acidity == 'sharp'
+    assert agent.calls[0]['acidity'] == 'sharp'
 
 
 async def test_resolved_reply_reaches_the_turn() -> None:
@@ -239,8 +250,13 @@ async def test_resolved_reply_reaches_the_turn() -> None:
 
     await respond(message)
 
-    assert agent.calls[0].referenced_author == 'Davi Lucciola'
-    assert agent.calls[0].referenced_excerpt == 'Eu posso te desligar ein'
+    assert agent.calls[0]['referenced_author'] == 'Davi Lucciola'
+    assert agent.calls[0]['referenced_excerpt'] == 'Eu posso te desligar ein'
+    spoken = agent.calls[0]['messages'][0].content
+    assert spoken == (
+        'Ada (12:23): respondendo a Davi Lucciola '
+        '("Eu posso te desligar ein"): responde ele'
+    )
 
 
 async def test_unresolved_reply_is_fetched() -> None:
@@ -256,8 +272,8 @@ async def test_unresolved_reply_is_fetched() -> None:
 
     await respond(message)
 
-    assert agent.calls[0].referenced_author == 'Davi Lucciola'
-    assert agent.calls[0].referenced_excerpt == 'Eu posso te desligar ein'
+    assert agent.calls[0]['referenced_author'] == 'Davi Lucciola'
+    assert agent.calls[0]['referenced_excerpt'] == 'Eu posso te desligar ein'
 
 
 async def test_failed_reply_fetch_leaves_the_turn_unmarked() -> None:
@@ -272,8 +288,8 @@ async def test_failed_reply_fetch_leaves_the_turn_unmarked() -> None:
 
     await respond(message)
 
-    assert agent.calls[0].referenced_author is None
-    assert agent.calls[0].referenced_excerpt is None
+    assert agent.calls[0]['referenced_author'] is None
+    assert agent.calls[0]['referenced_excerpt'] is None
 
 
 async def test_user_mention_becomes_the_username() -> None:
@@ -286,8 +302,9 @@ async def test_user_mention_becomes_the_username() -> None:
 
     await respond(message)
 
-    content = agent.calls[0].content
-    assert content == 'Qual é meu nome @maciota'
+    content = agent.calls[0]['messages'][0].content
+    assert content == 'Ada (12:23): Qual é meu nome @maciota'
+    assert '<@1568031015299981423>' not in content
     assert 'Maciota Bot' not in content
 
 
@@ -298,7 +315,7 @@ async def test_unresolved_mention_stays() -> None:
 
     await respond(message)
 
-    assert agent.calls[0].content == 'oi <@999>'
+    assert agent.calls[0]['messages'][0].content == 'Ada (12:23): oi <@999>'
 
 
 async def test_quoted_user_mention_becomes_the_username() -> None:
@@ -312,7 +329,7 @@ async def test_quoted_user_mention_becomes_the_username() -> None:
 
     await respond(message)
 
-    assert agent.calls[0].referenced_excerpt == 'fala com @ada e @ada'
+    assert agent.calls[0]['referenced_excerpt'] == 'fala com @ada e @ada'
 
 
 async def test_role_and_channel_mentions_become_names() -> None:
@@ -324,4 +341,4 @@ async def test_role_and_channel_mentions_become_names() -> None:
 
     await respond(message)
 
-    assert agent.calls[0].content == 'vem @mods no #geral'
+    assert agent.calls[0]['messages'][0].content == 'Ada (12:23): vem @mods no #geral'
